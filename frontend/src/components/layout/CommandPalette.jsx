@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { FileText, Globe2, Search, Sparkles, UserRound } from 'lucide-react'
+import { FileText, Globe2, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useCommandPalette } from '../../hooks/useCommandPalette'
@@ -7,12 +7,6 @@ import { useEvents } from '../../hooks/useEvents'
 import { useTrending } from '../../hooks/useTrending'
 import { Kbd } from '../ui/Kbd'
 import { Panel } from '../ui/Panel'
-
-const pages = [
-  { id: 'page-home', label: 'Home', path: '/', meta: '3D globe intelligence surface', icon: Globe2 },
-  { id: 'page-trending', label: 'Trending', path: '/trending', meta: 'Live cards and source velocity', icon: Sparkles },
-  { id: 'page-user', label: 'User', path: '/user', meta: 'Saved events and watchlists', icon: UserRound },
-]
 
 export function CommandPalette() {
   const navigate = useNavigate()
@@ -78,24 +72,9 @@ export function CommandPalette() {
         },
       }))
 
-    const pageItems = pages
-      .filter((page) => filter(`${page.label} ${page.meta}`))
-      .map((page) => ({
-        key: page.id,
-        group: 'PAGES',
-        title: page.label,
-        meta: page.meta,
-        icon: page.icon,
-        action: () => {
-          navigate(page.path)
-          close()
-        },
-      }))
-
     return [
       { name: 'EVENTS', items: eventItems },
       { name: 'TRENDING', items: trendingItems },
-      { name: 'PAGES', items: pageItems },
     ].filter((group) => group.items.length > 0)
   }, [close, events, location.pathname, navigate, query, trending])
 
@@ -166,7 +145,7 @@ export function CommandPalette() {
                   ref={inputRef}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search events, places, sources..."
+                  placeholder="Search incidents, places, sources..."
                   className="w-full border-0 bg-transparent text-[15px] text-white outline-none placeholder:text-text-dim"
                 />
               </div>
