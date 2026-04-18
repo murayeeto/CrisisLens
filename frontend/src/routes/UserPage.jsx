@@ -1,8 +1,8 @@
 import { BookmarkCheck, Radar, Settings2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import { events as allEvents, watchlists } from '../lib/mockData'
 import { useUser } from '../hooks/useUser'
+import { useEvents } from '../hooks/useEvents'
 import { ProfileHeader } from '../components/user/ProfileHeader'
 import { SavedEventsGrid } from '../components/user/SavedEventsGrid'
 import { Panel } from '../components/ui/Panel'
@@ -17,20 +17,24 @@ const tabs = [
 
 export default function UserPage({ onOpenEvent }) {
   const { data: user, loading } = useUser()
+  const { data: allEvents } = useEvents()
   const [tab, setTab] = useState('saved')
   const [savedEvents, setSavedEvents] = useState([])
   const [savedLoading, setSavedLoading] = useState(true)
-  const watchlistEvents = savedLoading
-    ? allEvents
-    : [...savedEvents, ...allEvents.filter((event) => !savedEvents.some((saved) => saved.id === event.id))]
 
   useEffect(() => {
     let active = true
 
-    api.getSavedEvents().then((response) => {
+    api.getSavedEventsForCurrentUser().then((response) => {
       if (!active) return
-      setSavedEvents(response)
+      setSavedEvents(Array.isArray(response) ? response : [])
       setSavedLoading(false)
+    }).catch((error) => {
+      console.error('Failed to fetch saved events:', error)
+      if (active) {
+        setSavedEvents([])
+        setSavedLoading(false)
+      }
     })
 
     return () => {
@@ -78,29 +82,12 @@ export default function UserPage({ onOpenEvent }) {
       ) : null}
 
       {tab === 'watchlists' ? (
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          {watchlists.map((watchlist) => (
-            <Panel key={watchlist.id} className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="font-display text-[22px] font-medium tracking-tightish text-white">{watchlist.name}</div>
-                  <p className="mt-2 text-sm leading-6 text-text-secondary">{watchlist.description}</p>
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-                  {watchlist.count} events
-                </div>
-              </div>
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {watchlistEvents
-                  .filter((event) => watchlist.eventIds.includes(event.id))
-                  .slice(0, 4)
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} onClick={() => onOpenEvent(event.id, 'watchlist')} />
-                  ))}
-              </div>
-            </Panel>
-          ))}
-        </div>
+        <Panel className="mt-8 px-6 py-14 text-center">
+          <div className="font-display text-[24px] font-medium text-white">Watchlists are coming soon</div>
+          <p className="mt-3 max-w-[520px] mx-auto text-sm leading-6 text-text-secondary">
+            Create custom watchlists to monitor specific event patterns and regions.
+          </p>
+        </Panel>
       ) : null}
 
       {tab === 'settings' ? (

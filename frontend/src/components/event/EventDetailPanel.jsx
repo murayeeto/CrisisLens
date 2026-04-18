@@ -127,7 +127,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                   <div className="space-y-6 p-5">
                     <div className="relative overflow-hidden rounded-[24px]">
                       <img
-                        src={detail.previewImage}
+                        src={detail.previewImage || fallbackImage}
                         alt={detail.title}
                         className="h-[300px] w-full object-cover"
                         onError={(event) => {
@@ -146,7 +146,7 @@ export function EventDetailPanel({ eventId, onClose }) {
 
                     <div>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
-                        ◦ {(detail.category || 'intel').toUpperCase()} · {detail.region.toUpperCase()}
+                        ◦ {(detail.category || 'intel').toUpperCase()} · {(detail.region || 'unknown').toUpperCase()}
                       </div>
                       <h2 className="mt-3 font-display text-[28px] font-semibold tracking-tightish text-white">{detail.title}</h2>
                       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-text-secondary">
@@ -156,7 +156,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                         </span>
                         <span className="inline-flex items-center gap-2 font-mono uppercase tracking-[0.12em]">
                           <Clock3 className="h-3.5 w-3.5 text-cyan-400" />
-                          Started {formatTimeAgo(detail.startedAt)} · Updated {formatTimeAgo(detail.updatedAt)}
+                          {detail.startedAt ? `Started ${formatTimeAgo(detail.startedAt)}` : 'Started recently'} · {detail.updatedAt ? `Updated ${formatTimeAgo(detail.updatedAt)}` : 'Recently updated'}
                         </span>
                       </div>
                     </div>
@@ -166,10 +166,14 @@ export function EventDetailPanel({ eventId, onClose }) {
                         ◦ AI Intelligence Summary
                       </div>
                       <div className="mt-4">
-                        <Typewriter text={detail.aiSummary} speed={18} />
+                        {detail.aiSummary ? (
+                          <Typewriter text={detail.aiSummary} speed={18} />
+                        ) : (
+                          <p className="text-[13px] leading-6 text-text-secondary">{detail.description || 'Analysis pending...'}</p>
+                        )}
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {detail.tags.map((tag) => (
+                        {(detail.tags || []).map((tag) => (
                           <span
                             key={tag}
                             className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted"
@@ -181,7 +185,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                     </section>
 
                     <section>
-                      <ImpactTriad impacts={detail.impacts} severity={detail.severity} />
+                      <ImpactTriad impacts={detail.impacts || []} severity={detail.severity} />
                     </section>
 
                     <section>
@@ -189,23 +193,23 @@ export function EventDetailPanel({ eventId, onClose }) {
                         ◦ What to Watch Next
                       </div>
                       <div className="mt-4">
-                        <WhatToWatch items={detail.whatToWatch} />
+                        <WhatToWatch items={detail.whatToWatch || []} />
                       </div>
                     </section>
 
                     <section>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
-                        ◦ Sources · {detail.sourcesCount}
+                        ◦ Sources · {(detail.sources || []).length || detail.sourcesCount || 0}
                       </div>
                       <div className="mt-4">
-                        <SourceList sources={detail.sources} />
+                        <SourceList sources={detail.sources || []} />
                       </div>
                     </section>
 
                     <section>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ How to Help</div>
                       <div className="mt-4 space-y-2">
-                        {detail.howToHelp.map((item) => (
+                        {(detail.howToHelp || []).map((item) => (
                           <a
                             key={item.label}
                             href={item.url}

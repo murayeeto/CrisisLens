@@ -1,0 +1,5 @@
+<!-- HTML for favicon placeholder -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="45" fill="#DC2626"/>
+  <text x="50" y="65" font-size="60" font-weight="bold" fill="white" text-anchor="middle">CL</text>
+</svg>

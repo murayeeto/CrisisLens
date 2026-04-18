@@ -4,7 +4,6 @@ import { ArrowUpRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useEvents } from '../hooks/useEvents'
 import { getUtcLabel } from '../lib/format'
-import { globalStats } from '../lib/mockData'
 import { Button } from '../components/ui/Button'
 import { ErrorState } from '../components/ui/ErrorState'
 import { GlobeHUD } from '../components/globe/GlobeHUD'
@@ -132,10 +131,10 @@ export default function HomePage({ onOpenEvent, activeEventId, isDetailOpen }) {
 
         <div className="pointer-events-auto absolute bottom-28 left-4 right-4 flex justify-center sm:bottom-24">
           <div className="grid w-full max-w-[900px] gap-3 md:grid-cols-4">
-            <StatTile label="Active Events" value={globalStats.activeEvents} />
-            <StatTile label="Countries" value={globalStats.countries} />
-            <StatTile label="Sources" value={globalStats.sources} />
-            <StatTile label="Updated <1h" value={globalStats.updatedLastHour} />
+            <StatTile label="Active Events" value={events.length} />
+            <StatTile label="Critical" value={events.filter((e) => e.severity === 'critical').length} />
+            <StatTile label="High" value={events.filter((e) => e.severity === 'high').length} />
+            <StatTile label="Updated now" value={events.length > 0 ? 'Live' : 'Loading'} />
           </div>
         </div>
 
