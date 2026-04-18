@@ -19,9 +19,9 @@ export const severityConfig = {
     shadow: 'shadow-panel',
     radius: 4,
   },
-  moderate: {
-    label: 'Moderate',
-    short: 'M.MODERATE',
+  medium: {
+    label: 'Medium',
+    short: 'M.MEDIUM',
     color: '#F59E0B',
     glow: 'rgba(245, 158, 11, 0.55)',
     tint: 'rgba(245, 158, 11, 0.12)',
@@ -51,7 +51,7 @@ export const severityConfig = {
   },
 }
 
-export const severityOrder = ['critical', 'high', 'moderate', 'low', 'info']
+export const severityOrder = ['critical', 'high', 'medium', 'low', 'info']
 
 export const getSeverityConfig = (severity) => severityConfig[severity] ?? severityConfig.info
 

@@ -1,6 +1,7 @@
 from config import config
 from models import AuthUser
 from utils.logger import logger
+from firebase_admin import auth as firebase_auth
 
 # Mock user for testing
 MOCK_USER = AuthUser(
@@ -14,17 +15,27 @@ class AuthService:
     def verify_token(token: str) -> AuthUser:
         """
         Verify Firebase token or mock token.
-        In production, this would verify with Firebase.
         """
         if config.USE_MOCK_AUTH:
             logger.info("Using mock auth mode")
             return MOCK_USER
         
         try:
-            # TODO: Implement real Firebase verification
-            # This is a stub for the hackathon
-            logger.warning("Real Firebase auth not yet implemented")
-            return MOCK_USER
+            from services.firebase_service import firebase_service
+            
+            decoded_token = firebase_service.verify_id_token(token)
+            
+            if not decoded_token:
+                logger.error("Token verification failed")
+                return None
+            
+            user = AuthUser(
+                user_id=decoded_token.get('uid'),
+                email=decoded_token.get('email', ''),
+                display_name=decoded_token.get('name', '')
+            )
+            
+            return user
         
         except Exception as e:
             logger.error(f"Auth verification error: {e}")

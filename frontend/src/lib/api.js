@@ -1,58 +1,46 @@
-import { mock } from './mockData'
+const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+const API_TIMEOUT = 45000 // 45 seconds for real API calls (needs time for geocoding + AI analysis)
 
-const BASE_URL = import.meta.env.VITE_API_BASE ?? ''
-const loggedFallbacks = new Set()
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const logFallback = (path, reason) => {
-  const key = `${path}:${reason}`
-  if (loggedFallbacks.has(key)) return
-  loggedFallbacks.add(key)
-  console.info(`[CrisisLens mock] ${path} -> ${reason}`)
-}
-
-const clone = (value) => structuredClone(value)
-
-async function safeFetch(path, fallback) {
-  const fallbackData = typeof fallback === 'function' ? fallback() : fallback
-
-  if (!BASE_URL) {
-    logFallback(path, 'VITE_API_BASE missing')
-    await wait(400)
-    return clone(fallbackData)
-  }
-
+async function fetch_api(path, options = {}) {
   const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), 1200)
+  const timeoutId = window.setTimeout(() => {
+    controller.abort()
+  }, API_TIMEOUT)
 
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...options.headers,
       },
+      ...options,
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
     return await response.json()
   } catch (error) {
-    const reason = error?.name === 'AbortError' ? 'timeout' : error?.message ?? 'request failed'
-    logFallback(path, reason)
-    await wait(400)
-    return clone(fallbackData)
+    if (error.name === 'AbortError') {
+      console.error(`[CrisisLens API] Timeout (${API_TIMEOUT}ms): ${path}`, error)
+      throw new Error(`Request timeout after ${API_TIMEOUT}ms`)
+    }
+    console.error(`[CrisisLens API] Error: ${path}`, error)
+    throw error
   } finally {
     window.clearTimeout(timeoutId)
   }
 }
 
 export const api = {
-  getEvents: () => safeFetch('/api/events', mock.events),
-  getEvent: (id) => safeFetch(`/api/events/${id}`, mock.eventDetail(id)),
-  getTrending: () => safeFetch('/api/news/trending', mock.trending),
-  getMe: () => safeFetch('/api/auth/me', mock.user),
-  getSavedEvents: () => safeFetch('/api/users/saved-events', mock.savedEvents),
+  getEvents: () => fetch_api('/api/events'),
+  getEvent: (id) => fetch_api(`/api/events/${id}`),
+  getTrending: () => fetch_api('/api/news/trending'),
+  getMe: () => fetch_api('/api/auth/me'),
+  getSavedEvents: () => fetch_api('/api/users/saved-events'),
+  saveEvent: (eventId) => fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'POST' }),
+  unsaveEvent: (eventId) => fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'DELETE' }),
 }
