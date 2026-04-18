@@ -26,130 +26,130 @@ def print_json(data):
 
 def cmd_health():
     """Check backend health."""
-    print("🏥 Checking backend health...")
+    print("[HEALTH] Checking backend health...")
     try:
         resp = requests.get(f"{BASE_URL}/health", timeout=5)
         resp.raise_for_status()
-        print("✅ Backend is running!")
+        print("[OK] Backend is running!")
         print_json(resp.json())
     except Exception as e:
-        print(f"❌ Backend not running: {e}")
+        print(f"[ERROR] Backend not running: {e}")
         sys.exit(1)
 
 def cmd_trending():
     """Fetch trending news."""
-    print("📰 Fetching trending news...")
+    print("[NEWS] Fetching trending news...")
     try:
         resp = requests.get(f"{BASE_URL}/api/news/trending", timeout=10)
         resp.raise_for_status()
         articles = resp.json()
-        print(f"✅ Found {len(articles)} articles\n")
+        print(f"[OK] Found {len(articles)} articles\n")
         for i, art in enumerate(articles[:3], 1):
             print(f"{i}. {art['title']}")
             print(f"   Source: {art['source_name']}")
             print(f"   {art['description'][:100]}...\n")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_generate():
     """Generate events from trending news."""
-    print("🔧 Generating events from trending news...")
+    print("[PROCESS] Generating events from trending news...")
     try:
         resp = requests.post(f"{BASE_URL}/api/events/generate?limit=3", timeout=30)
         resp.raise_for_status()
         events = resp.json()
-        print(f"✅ Generated {len(events)} events\n")
+        print(f"[OK] Generated {len(events)} events\n")
         for event in events:
             print(f"Event: {event['title']}")
             print(f"Location: {event['location']['name']} ({event['location']['latitude']}, {event['location']['longitude']})")
             print(f"Category: {event['ai_analysis']['category']}")
             print(f"Summary: {event['ai_analysis']['summary']}\n")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_events():
     """List all events."""
-    print("📍 Listing all events...")
+    print("[EVENTS] Listing all events...")
     try:
         resp = requests.get(f"{BASE_URL}/api/events", timeout=10)
         resp.raise_for_status()
         events = resp.json()
-        print(f"✅ Found {len(events)} events\n")
+        print(f"[OK] Found {len(events)} events\n")
         for event in events:
             print(f"ID: {event['id']}")
             print(f"Title: {event['title']}")
             print(f"Location: {event['location']['name']}")
             print()
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_event(event_id):
     """Get specific event."""
-    print(f"📍 Getting event {event_id}...")
+    print(f"[EVENT] Getting event {event_id}...")
     try:
         resp = requests.get(f"{BASE_URL}/api/events/{event_id}", timeout=10)
         resp.raise_for_status()
         event = resp.json()
-        print("✅ Event found:\n")
+        print("[OK] Event found:\n")
         print_json(event)
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
-            print("❌ Event not found")
+            print("[ERROR] Event not found")
         else:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] Error: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_auth():
     """Check current auth."""
-    print("🔐 Checking auth...")
+    print("[AUTH] Checking auth...")
     try:
         resp = requests.get(f"{BASE_URL}/api/auth/me", timeout=10)
         resp.raise_for_status()
         user = resp.json()
-        print("✅ Authenticated as:\n")
+        print("[OK] Authenticated as:\n")
         print_json(user)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_saved():
     """List saved events."""
-    print("⭐ Listing saved events...")
+    print("[SAVED] Listing saved events...")
     try:
         resp = requests.get(f"{BASE_URL}/api/users/saved-events", timeout=10)
         resp.raise_for_status()
         events = resp.json()
-        print(f"✅ Found {len(events)} saved events\n")
+        print(f"[OK] Found {len(events)} saved events\n")
         for event in events:
             print(f"ID: {event['id']}")
             print(f"Title: {event['title']}")
             print()
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def cmd_save(event_id):
     """Save an event."""
-    print(f"⭐ Saving event {event_id}...")
+    print(f"[SAVED] Saving event {event_id}...")
     try:
         resp = requests.post(f"{BASE_URL}/api/users/saved-events/{event_id}", timeout=10)
         resp.raise_for_status()
         result = resp.json()
-        print("✅ Event saved!\n")
+        print("[OK] Event saved!\n")
         print_json(result)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 def main():
     """Main CLI."""
-    print("🚨 CrisisLens CLI Test Client\n")
+    print("[CLI] CrisisLens CLI Test Client\n")
     
     if len(sys.argv) < 2:
         print("Usage:")

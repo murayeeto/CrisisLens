@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 import os
 from config import config
 from utils.logger import logger
 from routes import health, news, events, auth, users
-from test_page import get_test_page_html
 
 app = FastAPI(
     title="CrisisLens API",
@@ -29,15 +27,9 @@ app.include_router(events.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 
-# Test page
-@app.get("/test", response_class=HTMLResponse)
-def get_test_page():
-    """Serve test dashboard HTML page."""
-    return get_test_page_html()
-
 @app.on_event("startup")
 async def startup_event():
-    logger.info("🚀 CrisisLens Backend started")
+    logger.info("[START] CrisisLens Backend started")
     logger.info(f"Mock Auth Mode: {config.USE_MOCK_AUTH}")
     logger.info(f"Mock Data Mode: {config.USE_MOCK_DATA}")
 
