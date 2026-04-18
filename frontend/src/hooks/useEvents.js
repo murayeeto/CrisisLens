@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 
-export function useUser() {
-  const [data, setData] = useState(null)
+export function useEvents() {
+  const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -10,10 +10,12 @@ export function useUser() {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.getMe()
-      setData(response)
+      const response = await api.getEvents()
+      setData(Array.isArray(response) ? response : [])
     } catch (err) {
+      console.error('Failed to fetch events:', err)
       setError(err)
+      setData([])
     } finally {
       setLoading(false)
     }

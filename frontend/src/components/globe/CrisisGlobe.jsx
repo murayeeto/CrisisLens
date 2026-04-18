@@ -189,7 +189,7 @@ export default function CrisisGlobe({
           ringsData={ringEvents}
           ringLat={(d) => d.lat}
           ringLng={(d) => d.lng}
-          ringColor={(d) => () => severityColorRGBA(d.severity)}
+          ringColor={(d) => severityColorRGBA(d.severity)}
           ringMaxRadius={(d) => severityRadius(d.severity)}
           ringPropagationSpeed={1.5}
           ringRepeatPeriod={1200}

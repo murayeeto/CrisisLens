@@ -11,9 +11,11 @@ export function useTrending() {
     setError(null)
     try {
       const response = await api.getTrending()
-      setData(response)
+      setData(Array.isArray(response) ? response : [])
     } catch (err) {
+      console.error('Failed to fetch trending news:', err)
       setError(err)
+      setData([])
     } finally {
       setLoading(false)
     }
