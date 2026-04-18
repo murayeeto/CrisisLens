@@ -1,10 +1,14 @@
 import { Bookmark } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EventCard } from '../event/EventCard'
 import { Panel } from '../ui/Panel'
 
 export function SavedEventsGrid({ events = [], onOpenEvent }) {
   const [savedIds, setSavedIds] = useState(events.map((event) => event.id))
+
+  useEffect(() => {
+    setSavedIds(events.map((event) => event.id))
+  }, [events])
 
   const visibleEvents = useMemo(() => events.filter((event) => savedIds.includes(event.id)), [events, savedIds])
 
@@ -18,8 +22,8 @@ export function SavedEventsGrid({ events = [], onOpenEvent }) {
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-400">
           <Bookmark className="h-5 w-5" />
         </div>
-        <div className="mt-4 font-display text-[22px] font-medium text-white">No saved events yet</div>
-        <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">⌘K to start exploring.</div>
+        <div className="mt-4 font-display text-[22px] font-medium text-white">No saved intel yet</div>
+        <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">⌘K to start tracking signals.</div>
       </Panel>
     )
   }
@@ -30,7 +34,7 @@ export function SavedEventsGrid({ events = [], onOpenEvent }) {
         <EventCard
           key={event.id}
           event={event}
-          onClick={() => onOpenEvent(event.id, 'user')}
+          onClick={() => onOpenEvent(event.id, 'account')}
           showBookmark
           saved={savedIds.includes(event.id)}
           onToggleSave={toggleSaved}

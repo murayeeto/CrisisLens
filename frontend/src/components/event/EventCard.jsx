@@ -1,4 +1,4 @@
-import { Bookmark, FileText, MapPin } from 'lucide-react'
+import { Bookmark, FileText, MapPin, Sparkles } from 'lucide-react'
 import { formatTimeAgo, makeFallbackImage } from '../../lib/format'
 import { SeverityBadge } from './SeverityBadge'
 import { Panel } from '../ui/Panel'
@@ -10,6 +10,7 @@ export function EventCard({
   saved = false,
   onToggleSave,
   active = false,
+  note,
 }) {
   const fallbackImage = makeFallbackImage(event.title, event.severity === 'critical' ? '#EF4444' : '#22D3EE')
 
@@ -60,6 +61,12 @@ export function EventCard({
         <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
           {(event.category || 'intel').replace('-', ' ')}
         </div>
+        {note ? (
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-500/15 bg-cyan-500/[0.08] px-2.5 py-1 text-[11px] text-cyan-100/90">
+            <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="line-clamp-2">{note}</span>
+          </div>
+        ) : null}
         <h3 className="mt-2 line-clamp-2 font-display text-[17px] font-medium tracking-tightish text-white">{event.title}</h3>
         <p className="mt-2 line-clamp-2 text-[13px] leading-6 text-text-secondary">{event.previewText}</p>
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">

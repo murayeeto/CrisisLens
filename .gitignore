@@ -63,3 +63,6 @@ yarn-error.log*
 .turbo
 *.bak
 *~
+
+!frontend/src/lib/
+!frontend/src/lib/**
