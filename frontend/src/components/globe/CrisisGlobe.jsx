@@ -55,6 +55,35 @@ export default function CrisisGlobe({
       .filter(Boolean)
   }, [events])
 
+  const isPointVisible = useCallback((lat, lng) => {
+    if (!globeRef.current) return true
+    
+    // Get current camera position
+    const pov = globeRef.current.pointOfView?.()
+    if (!pov) return true
+
+    // Convert lat/lng to radians
+    const pointLat = (lat * Math.PI) / 180
+    const pointLng = (lng * Math.PI) / 180
+    const camLat = (pov.lat * Math.PI) / 180
+    const camLng = (pov.lng * Math.PI) / 180
+
+    // Convert to 3D cartesian coordinates (points on unit sphere)
+    const pointX = Math.cos(pointLat) * Math.cos(pointLng)
+    const pointY = Math.sin(pointLat)
+    const pointZ = Math.cos(pointLat) * Math.sin(pointLng)
+
+    const camX = Math.cos(camLat) * Math.cos(camLng)
+    const camY = Math.sin(camLat)
+    const camZ = Math.cos(camLat) * Math.sin(camLng)
+
+    // Dot product: positive means point is on visible side (front-facing)
+    // Return true if point is on front hemisphere
+    const dotProduct = pointX * camX + pointY * camY + pointZ * camZ
+
+    return dotProduct > 0
+  }, [])
+
   const stopAutoRotate = useCallback(() => {
     window.clearTimeout(resumeRotateRef.current)
     const controls = globeRef.current?.controls?.()
@@ -121,11 +150,28 @@ export default function CrisisGlobe({
   useEffect(() => {
     const interval = window.setInterval(() => {
       const view = globeRef.current?.pointOfView?.()
-      if (view) onViewChange?.(view)
-    }, 220)
+      if (view) {
+        onViewChange?.(view)
+        
+        // Update pin visibility based on current camera position
+        // Query the entire document since pins are rendered inside the Globe canvas container
+        globeEvents.forEach((event) => {
+          const elements = document.querySelectorAll(`[data-event-id="${event.id}"]`)
+          elements.forEach((element) => {
+            if (isPointVisible(event.lat, event.lng)) {
+              element.style.visibility = 'visible'
+              element.style.pointerEvents = 'auto'
+            } else {
+              element.style.visibility = 'hidden'
+              element.style.pointerEvents = 'none'
+            }
+          })
+        })
+      }
+    }, 100)
 
     return () => window.clearInterval(interval)
-  }, [onViewChange])
+  }, [onViewChange, globeEvents, isPointVisible])
 
   const updateTooltipPosition = useCallback((mouseEvent, event) => {
     const rect = containerRef.current?.getBoundingClientRect()
@@ -166,9 +212,11 @@ export default function CrisisGlobe({
           htmlElement={(d) => {
             const el = document.createElement('div')
             el.className = `crisis-pin crisis-pin--${d.severity}`
+            el.setAttribute('data-event-id', d.id)
             el.style.pointerEvents = 'auto'
             el.style.opacity = d.isDimmed ? '0.25' : '1'
             el.style.transform = `translate(-50%, -50%) scale(${d.id === selectedEventId ? 1.15 : 1})`
+            
             el.innerHTML = `
               <div class="crisis-pin__halo"></div>
               <div class="crisis-pin__ring"></div>
