@@ -62,9 +62,14 @@ def cmd_generate():
         print(f"[OK] Generated {len(events)} events\n")
         for event in events:
             print(f"Event: {event['title']}")
+            print(f"Description: {event['description']}")
             print(f"Location: {event['location']['name']} ({event['location']['latitude']}, {event['location']['longitude']})")
             print(f"Category: {event['ai_analysis']['category']}")
-            print(f"Summary: {event['ai_analysis']['summary']}\n")
+            print(f"Summary: {event['ai_analysis']['summary']}")
+            print(f"Affected Groups: {', '.join(event['ai_analysis']['affected_groups'])}")
+            print(f"Impact Analysis: {event['ai_analysis']['impact_analysis']}")
+            print(f"How to Help: {event['ai_analysis']['how_to_help']}")
+            print(f"Watch Guidance: {event['ai_analysis']['watch_guidance']}\n")
     except Exception as e:
         print(f"[ERROR] Error: {e}")
         sys.exit(1)
