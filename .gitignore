@@ -39,6 +39,8 @@ build/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.*.production
 
 # IDEs
 .vscode/
@@ -63,6 +65,19 @@ yarn-error.log*
 .turbo
 *.bak
 *~
+
+# Secrets & Credentials - NEVER commit these
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*credentials*.json
+*-adminsdk*.json
+*firebase-adminsdk*.json
+crisislens-*.json
+config/credentials/*
+secrets/*
 
 !frontend/src/lib/
 !frontend/src/lib/**
