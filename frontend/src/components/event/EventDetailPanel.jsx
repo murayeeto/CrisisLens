@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bookmark, Clock3, ExternalLink, MapPin, Share2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEventDetail } from '../../hooks/useEventDetail'
 import { formatCoords, formatTimeAgo, makeFallbackImage } from '../../lib/format'
@@ -45,30 +45,79 @@ export function EventDetailPanel({ eventId, onClose }) {
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useEventDetail(eventId)
   const [saved, setSaved] = useState(false)
+  const [shareLabel, setShareLabel] = useState('Share')
   const origin = useMemo(() => {
     if (location.pathname === '/trending') return 'TRENDING'
-    if (location.pathname === '/user') return 'PROFILE'
+    if (location.pathname === '/account' || location.pathname === '/desk' || location.pathname === '/user') return 'ACCOUNT'
     return 'GLOBE'
   }, [location.pathname])
+
+  const handleClose = useCallback(() => {
+    const search = new URLSearchParams(location.search)
+    if (search.has('event')) {
+      search.delete('event')
+      navigate(
+        {
+          pathname: location.pathname,
+          search: search.toString() ? `?${search.toString()}` : '',
+        },
+        { replace: true },
+      )
+    }
+    onClose()
+  }, [location.pathname, location.search, navigate, onClose])
 
   useEffect(() => {
     if (!eventId) return
 
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') handleClose()
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [eventId, onClose])
+  }, [eventId, handleClose])
+
+  useEffect(() => {
+    setShareLabel('Share')
+    setSaved(false)
+  }, [eventId])
 
   const shareEvent = async () => {
     if (!eventId) return
-    const url = `${window.location.origin}/trending?event=${eventId}`
+    const url = new URL('/trending', window.location.origin)
+    url.searchParams.set('event', eventId)
+    const shareUrl = url.toString()
+
     try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      window.prompt('Copy event link', url)
+      if (navigator.share) {
+        await navigator.share({
+          title: detail?.title ?? 'CrisisLens event',
+          text: detail?.previewText ?? 'Tracked event from CrisisLens',
+          url: shareUrl,
+        })
+        setShareLabel('Shared')
+        window.setTimeout(() => setShareLabel('Share'), 1800)
+        return
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareLabel('Link copied')
+        window.setTimeout(() => setShareLabel('Share'), 1800)
+        return
+      }
+
+      throw new Error('Clipboard unavailable')
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setShareLabel('Share')
+        return
+      }
+
+      window.prompt('Copy event link', shareUrl)
+      setShareLabel('Copy link')
+      window.setTimeout(() => setShareLabel('Share'), 1800)
     }
   }
 
@@ -91,7 +140,7 @@ export function EventDetailPanel({ eventId, onClose }) {
             <div className="absolute left-0 top-0 h-full w-px bg-cyan-500/50 shadow-[0_0_18px_rgba(34,211,238,0.35)]" />
 
             <Panel className="thin-scrollbar h-full overflow-hidden rounded-none border-r-0 md:rounded-l-[28px]">
-              {loading ? <DetailSkeleton onClose={onClose} /> : null}
+              {loading ? <DetailSkeleton onClose={handleClose} /> : null}
 
               {!loading && error ? (
                 <div className="p-5">
@@ -115,7 +164,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                         <button
                           type="button"
                           aria-label="Close event panel"
-                          onClick={onClose}
+                          onClick={handleClose}
                           className="rounded-full p-2 text-text-muted transition hover:bg-white/[0.04] hover:text-white"
                         >
                           <X className="h-4 w-4" />
@@ -140,7 +189,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                       </div>
                       <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white">
                         <LiveDot color="red" />
-                        Live · 3 sources new in last hour
+                        3 sources new in last hour
                       </div>
                     </div>
 
@@ -227,18 +276,18 @@ export function EventDetailPanel({ eventId, onClose }) {
                     <div className="flex flex-wrap gap-2 border-t border-white/8 pt-2">
                       <Button variant="secondary" className="px-4 py-2 text-[11px]" onClick={() => setSaved((current) => !current)}>
                         <Bookmark className={`h-3.5 w-3.5 ${saved ? 'fill-cyan-400 text-cyan-400' : ''}`} />
-                        {saved ? 'Saved to profile' : 'Save to profile'}
+                        {saved ? 'Saved to account' : 'Save to account'}
                       </Button>
                       <Button variant="secondary" className="px-4 py-2 text-[11px]" onClick={shareEvent}>
                         <Share2 className="h-3.5 w-3.5" />
-                        Share
+                        {shareLabel}
                       </Button>
                       <Button
                         variant="ghost"
                         className="px-4 py-2 text-[11px]"
                         onClick={() => {
-                          navigate('/trending')
-                          onClose()
+                          navigate(`/trending?event=${eventId}`)
+                          handleClose()
                         }}
                       >
                         Open on trending page

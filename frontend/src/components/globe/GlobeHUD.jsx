@@ -8,7 +8,7 @@ export function GlobeHUD({ event, pov }) {
 
   return (
     <Panel className="w-full max-w-[240px] p-4">
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ Live Feed</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ Orbital Feed</div>
       <div className="mt-4">
         <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
           Hovering — {event ? event.title : 'None'}

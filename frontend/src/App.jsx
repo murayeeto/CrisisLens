@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useState } from 'react'
 import { BackgroundFX } from './components/layout/BackgroundFX'
@@ -27,9 +27,16 @@ function RouteFrame({ children }) {
 function AppLayout() {
   const location = useLocation()
   const [selectedEventId, setSelectedEventId] = useState(null)
+  const [activeSeverities, setActiveSeverities] = useState([])
 
   const openEvent = useCallback((id) => setSelectedEventId(id), [])
   const closeEvent = useCallback(() => setSelectedEventId(null), [])
+  const toggleSeverity = useCallback((severity) => {
+    setActiveSeverities((current) =>
+      current.includes(severity) ? current.filter((item) => item !== severity) : [...current, severity],
+    )
+  }, [])
+  const clearSeverityFilter = useCallback(() => setActiveSeverities([]), [])
 
   useEffect(() => {
     const handleOpenEvent = (event) => {
@@ -40,6 +47,14 @@ function AppLayout() {
     window.addEventListener('crisislens:open-event', handleOpenEvent)
     return () => window.removeEventListener('crisislens:open-event', handleOpenEvent)
   }, [])
+
+  useEffect(() => {
+    const search = new URLSearchParams(location.search)
+    const sharedEventId = search.get('event')
+    if (sharedEventId) {
+      setSelectedEventId(sharedEventId)
+    }
+  }, [location.search])
 
   return (
     <>
@@ -52,7 +67,13 @@ function AppLayout() {
               path="/"
               element={
                 <RouteFrame>
-                  <HomePage onOpenEvent={openEvent} activeEventId={selectedEventId} isDetailOpen={Boolean(selectedEventId)} />
+                  <HomePage
+                    onOpenEvent={openEvent}
+                    activeEventId={selectedEventId}
+                    isDetailOpen={Boolean(selectedEventId)}
+                    activeSeverities={activeSeverities}
+                    onToggleSeverity={toggleSeverity}
+                  />
                 </RouteFrame>
               }
             />
@@ -65,10 +86,26 @@ function AppLayout() {
               }
             />
             <Route
-              path="/user"
+              path="/account"
               element={
                 <RouteFrame>
                   <UserPage onOpenEvent={openEvent} activeEventId={selectedEventId} />
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/desk"
+              element={
+                <RouteFrame>
+                  <Navigate to="/account" replace />
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/user"
+              element={
+                <RouteFrame>
+                  <Navigate to="/account" replace />
                 </RouteFrame>
               }
             />
@@ -83,7 +120,11 @@ function AppLayout() {
           </Routes>
         </AnimatePresence>
       </main>
-      <TickerBar />
+      <TickerBar
+        activeSeverities={activeSeverities}
+        onSelectSeverity={toggleSeverity}
+        onClearSeverityFilter={clearSeverityFilter}
+      />
       <CommandPalette />
       <EventDetailPanel eventId={selectedEventId} onClose={closeEvent} />
     </>

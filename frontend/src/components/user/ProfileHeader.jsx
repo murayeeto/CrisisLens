@@ -41,9 +41,10 @@ export function ProfileHeader({ user }) {
           </div>
 
           <div>
-            <div className="font-display text-[24px] font-medium tracking-tightish text-white">{user.name}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ Account profile</div>
+            <div className="mt-2 font-display text-[28px] font-medium tracking-tightish text-white">{user.name}</div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-text-secondary">
-              <span>{user.handle}</span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{user.handle}</span>
               <span>{user.email}</span>
               <span className="rounded-full border border-cyan-500/20 bg-cyan-500/8 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
                 {user.role}
@@ -51,7 +52,7 @@ export function ProfileHeader({ user }) {
               <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">{formatJoinedAt(user.joinedAt)}</span>
             </div>
             <div className="mt-6">
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ Analyst activity · 14 days</div>
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ Coverage cadence · 14 days</div>
               <svg viewBox={`0 0 ${width} ${height}`} className="h-12 w-full max-w-[280px] overflow-visible">
                 <defs>
                   <linearGradient id="spark-line" x1="0" x2="1">
@@ -71,9 +72,9 @@ export function ProfileHeader({ user }) {
         </div>
 
         <div className="grid flex-none gap-3 sm:grid-cols-3">
-          <StatTile className="min-w-[150px]" label="Saved Events" value={user.stats.savedEvents} compact />
-          <StatTile className="min-w-[150px]" label="Events Seen" value={user.stats.eventsSeen} compact />
-          <StatTile className="min-w-[150px]" label="Watchlists" value={user.stats.watchlists} compact />
+          <StatTile className="min-w-[150px]" label="Saved Intel" value={user.stats.savedEvents} compact />
+          <StatTile className="min-w-[150px]" label="Signals Reviewed" value={user.stats.eventsSeen} compact />
+          <StatTile className="min-w-[150px]" label="AI Watchlist" value={user.stats.watchlists} compact />
         </div>
       </div>
     </Panel>

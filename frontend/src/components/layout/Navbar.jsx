@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import clsx from 'clsx'
-import { useEvents } from '../../hooks/useEvents'
 import { openCommandPalette } from '../../hooks/useCommandPalette'
 import { Kbd } from '../ui/Kbd'
-import { LiveDot } from '../ui/LiveDot'
 
 function LogoMark() {
   return (
@@ -23,11 +21,10 @@ function LogoMark() {
 const links = [
   { to: '/', label: 'Home' },
   { to: '/trending', label: 'Trending' },
-  { to: '/user', label: 'User' },
+  { to: '/account', label: 'Account' },
 ]
 
 export function Navbar() {
-  const { data: events } = useEvents()
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -36,8 +33,6 @@ export function Navbar() {
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
-
-  const liveCount = useMemo(() => events.length || 14, [events.length])
 
   return (
     <motion.header
@@ -53,7 +48,6 @@ export function Navbar() {
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold tracking-tightish text-white">CrisisLens</div>
           </div>
-          <span className="hidden font-mono text-[11px] uppercase tracking-[0.14em] text-text-dim sm:inline">◦ v0.1</span>
         </Link>
 
         <nav className="hidden items-center gap-2 md:flex">
@@ -83,7 +77,7 @@ export function Navbar() {
             className="glass-panel glass-panel--interactive hidden items-center gap-3 rounded-full px-4 py-2 md:flex"
           >
             <Search className="h-4 w-4 text-text-muted" />
-            <span className="text-sm text-text-secondary">Search events, places, sources</span>
+            <span className="text-sm text-text-secondary">Search incidents, locations, sources</span>
             <span className="flex items-center gap-1">
               <Kbd>⌘</Kbd>
               <Kbd>K</Kbd>
@@ -98,13 +92,6 @@ export function Navbar() {
           >
             <Search className="h-4 w-4 text-text-secondary" />
           </button>
-
-          <div className="glass-panel flex items-center gap-2 rounded-full px-3 py-2">
-            <LiveDot color="red" />
-            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-secondary">
-              Live · {liveCount} Events
-            </span>
-          </div>
         </div>
       </div>
     </motion.header>
