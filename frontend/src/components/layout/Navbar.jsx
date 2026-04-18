@@ -2,21 +2,9 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Search } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
-import clsx from 'clsx'
 import { openCommandPalette } from '../../hooks/useCommandPalette'
 import { Kbd } from '../ui/Kbd'
-
-function LogoMark() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 text-cyan-500">
-      <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="10.5" r="6.5" />
-        <path d="M5.8 10.5h12.4M12 4a11.4 11.4 0 0 1 0 13M12 4a11.4 11.4 0 0 0 0 13" />
-        <path d="M15.8 16.2 12 22l-3.8-5.8" />
-      </g>
-    </svg>
-  )
-}
+import { BrandMark } from './BrandBadge'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -43,29 +31,19 @@ export function Navbar() {
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-2 border-b border-white/6 bg-transparent">
-        <Link to="/" className="mr-1 flex min-w-0 items-center gap-3 rounded-full px-3 py-2 transition hover:bg-white/[0.03]">
-          <LogoMark />
-          <div className="min-w-0">
-            <div className="truncate font-display text-[15px] font-semibold tracking-tightish text-white">CrisisLens</div>
-          </div>
+        <Link to="/" aria-label="CrisisLens home" className="mr-2 flex shrink-0 rounded-full p-1 transition hover:bg-white/[0.03]">
+          <BrandMark className="h-10 w-10 sm:h-11 sm:w-11" />
+          <span className="sr-only">CrisisLens</span>
         </Link>
 
         <nav className="hidden items-center gap-2 md:flex">
           {links.map((link) => (
-            <NavLink key={link.to} to={link.to}>
-              {({ isActive }) => (
-                <span
-                  className={clsx(
-                    'relative inline-flex items-center rounded-full px-4 py-1.5 text-[13px] font-medium uppercase tracking-[0.14em] transition-all duration-200',
-                    isActive ? 'animated-border bg-white/5 text-white shadow-[inset_0_0_0_1px_rgba(34,211,238,0.22)]' : 'text-text-muted hover:bg-white/[0.03] hover:text-white',
-                  )}
-                >
-                  {link.label}
-                  {isActive ? (
-                    <span className="absolute bottom-[5px] left-1/2 h-px w-[60%] -translate-x-1/2 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                  ) : null}
-                </span>
-              )}
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className="inline-flex items-center rounded-full px-4 py-1.5 text-[13px] font-medium uppercase tracking-[0.14em] text-text-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-white"
+            >
+              {link.label}
             </NavLink>
           ))}
         </nav>
