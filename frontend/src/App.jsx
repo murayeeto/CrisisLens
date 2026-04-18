@@ -74,7 +74,7 @@ function AppLayout() {
                 <RouteFrame>
                   <HomePage
                     onOpenEvent={openEvent}
-                    activeEventId={selectedEventId}
+                    detailEventId={selectedEventId}
                     isDetailOpen={Boolean(selectedEventId)}
                     activeSeverities={activeSeverities}
                     onToggleSeverity={toggleSeverity}

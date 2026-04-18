@@ -247,6 +247,13 @@ img {
   pointer-events: auto;
 }
 
+.crisis-pin__hit {
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
 .crisis-pin__core {
   position: absolute;
   inset: 5px;
@@ -304,6 +311,12 @@ img {
 .crisis-globe {
   position: relative;
   isolation: isolate;
+  cursor: grab;
+  touch-action: none;
+}
+
+.crisis-globe.is-dragging {
+  cursor: grabbing;
 }
 
 .crisis-globe::before {

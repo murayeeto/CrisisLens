@@ -3,15 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import * as THREE from 'three'
 import { formatTimeAgo } from '../../lib/format'
+import { getConnectedEventIds, linkedPairs } from '../../lib/globeConnections'
 import { severityColorRGBA, severityRadius } from '../../lib/severity'
-
-const linkedPairs = [
-  ['evt_wildfire_ca_2026_0418', 'evt_heatwave_es_2026_0418'],
-  ['evt_typhoon_ph_2026_0417', 'evt_port_nl_2026_0418'],
-  ['evt_quake_jp_2026_0418', 'evt_transit_uk_2026_0418'],
-  ['evt_port_nl_2026_0418', 'evt_transit_uk_2026_0418'],
-  ['evt_typhoon_ph_2026_0417', 'evt_quake_jp_2026_0418'],
-]
 
 const dayNightShader = {
   vertexShader: `
@@ -130,9 +123,10 @@ const getSunPosition = (date = new Date()) => {
 export default function CrisisGlobe({
   events,
   activeSeverities,
-  selectedEventId,
+  focusedEventId,
   dimmed,
-  onEventSelect,
+  onEventInspect,
+  onClearFocus,
   onHoverChange,
   onViewChange,
 }) {
@@ -141,25 +135,33 @@ export default function CrisisGlobe({
   const globeRef = useRef(null)
   const resumeRotateRef = useRef(null)
   const globeMaterialRef = useRef(null)
+  const hoveredPinRef = useRef(false)
+  const tooltipElementRef = useRef(null)
+  const isDraggingRef = useRef(false)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [globeMaterial, setGlobeMaterial] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cleanup tooltip on unmount
       if (tooltipElementRef.current && tooltipElementRef.current.parentNode) {
         tooltipElementRef.current.parentNode.removeChild(tooltipElementRef.current)
-      }
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current)
       }
     }
   }, [])
 
-  const visibleEvents = useMemo(
+  const baseVisibleEvents = useMemo(
     () => (activeSeverities.length ? events.filter((event) => activeSeverities.includes(event.severity)) : events),
     [activeSeverities, events],
   )
+
+  const visibleEvents = useMemo(() => {
+    if (!focusedEventId) return baseVisibleEvents
+
+    const connectedIds = getConnectedEventIds(focusedEventId)
+    return baseVisibleEvents.filter((event) => connectedIds.has(event.id))
+  }, [baseVisibleEvents, focusedEventId])
 
   const arcs = useMemo(() => {
     return linkedPairs
@@ -211,6 +213,27 @@ export default function CrisisGlobe({
     const controls = globeRef.current?.controls?.()
     if (controls) controls.autoRotate = false
   }, [])
+
+  const resumeAutoRotate = useCallback(() => {
+    window.clearTimeout(resumeRotateRef.current)
+
+    if (reducedMotion || dimmed || isDraggingRef.current) return
+
+    const controls = globeRef.current?.controls?.()
+    if (!controls) return
+
+    controls.autoRotate = true
+  }, [dimmed, reducedMotion])
+
+  const scheduleAutoRotateResume = useCallback((delay = 900) => {
+    window.clearTimeout(resumeRotateRef.current)
+
+    if (reducedMotion || dimmed || isDraggingRef.current) return
+
+    resumeRotateRef.current = window.setTimeout(() => {
+      resumeAutoRotate()
+    }, delay)
+  }, [dimmed, reducedMotion, resumeAutoRotate])
 
   useEffect(() => {
     const element = containerRef.current
@@ -286,22 +309,66 @@ export default function CrisisGlobe({
 
   useEffect(() => {
     let controls
-    const handleStart = () => stopAutoRotate()
+    const handleStart = () => {
+      setIsDragging(true)
+      isDraggingRef.current = true
+      stopAutoRotate()
+    }
+    const handleEnd = () => {
+      setIsDragging(false)
+      isDraggingRef.current = false
+      scheduleAutoRotateResume(700)
+    }
 
     const frame = requestAnimationFrame(() => {
       controls = globeRef.current?.controls?.()
       if (!controls) return
-      controls.autoRotate = !reducedMotion && !selectedEventId
-      controls.autoRotateSpeed = 0.35
+      controls.autoRotate = !reducedMotion && !dimmed
+      controls.autoRotateSpeed = size.w < 768 ? 0.46 : 0.56
       controls.enablePan = false
+      controls.enableDamping = true
+      controls.dampingFactor = 0.08
+      controls.rotateSpeed = size.w < 768 ? 0.62 : 0.78
+      controls.zoomSpeed = 0.8
+      controls.minPolarAngle = Math.PI * 0.18
+      controls.maxPolarAngle = Math.PI * 0.82
       controls.addEventListener('start', handleStart)
+      controls.addEventListener('end', handleEnd)
     })
 
     return () => {
       cancelAnimationFrame(frame)
       controls?.removeEventListener('start', handleStart)
+      controls?.removeEventListener('end', handleEnd)
     }
-  }, [reducedMotion, selectedEventId, stopAutoRotate])
+  }, [dimmed, reducedMotion, scheduleAutoRotateResume, size.w, stopAutoRotate])
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+
+    const handlePointerMove = () => {
+      if (!hoveredPinRef.current && !dimmed && !isDraggingRef.current) {
+        resumeAutoRotate()
+      }
+    }
+    const handlePointerLeave = () => {
+      if (tooltipElementRef.current) {
+        tooltipElementRef.current.style.display = 'none'
+      }
+      hoveredPinRef.current = false
+      onHoverChange?.(null)
+      resumeAutoRotate()
+    }
+
+    element.addEventListener('pointermove', handlePointerMove)
+    element.addEventListener('pointerleave', handlePointerLeave)
+
+    return () => {
+      element.removeEventListener('pointermove', handlePointerMove)
+      element.removeEventListener('pointerleave', handlePointerLeave)
+    }
+  }, [dimmed, onHoverChange, resumeAutoRotate])
 
   useEffect(() => {
     if (!globeRef.current) return
@@ -309,24 +376,21 @@ export default function CrisisGlobe({
     const pointOfView = globeRef.current.pointOfView
     const controls = globeRef.current.controls?.()
 
-    if (selectedEventId) {
-      const event = events.find((item) => item.id === selectedEventId)
+    if (focusedEventId) {
+      const event = events.find((item) => item.id === focusedEventId)
       if (!event) return
       stopAutoRotate()
       pointOfView({ lat: event.lat, lng: event.lng, altitude: size.w < 768 ? 1.12 : 0.92 }, 1000)
       onHoverChange?.(event)
+      scheduleAutoRotateResume(1100)
       return
     }
 
     pointOfView({ altitude: size.w < 768 ? 2.22 : 1.82 }, 800)
-    if (!reducedMotion && controls) {
-      resumeRotateRef.current = window.setTimeout(() => {
-        controls.autoRotate = true
-      }, 3000)
-    }
+    if (!reducedMotion && controls) scheduleAutoRotateResume(320)
 
     return () => window.clearTimeout(resumeRotateRef.current)
-  }, [events, onHoverChange, reducedMotion, selectedEventId, size.w, stopAutoRotate])
+  }, [dimmed, events, focusedEventId, onHoverChange, reducedMotion, scheduleAutoRotateResume, size.w, stopAutoRotate])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -352,16 +416,19 @@ export default function CrisisGlobe({
     return () => window.clearInterval(interval)
   }, [onViewChange, visibleEvents, isPointVisible])
 
-  const debounceTimerRef = useRef(null)
-  const tooltipElementRef = useRef(null)
-
   const handlePinClick = useCallback(
     (event) => {
+      if (focusedEventId === event.id) {
+        onClearFocus?.()
+        scheduleAutoRotateResume(500)
+        return
+      }
+
       stopAutoRotate()
       globeRef.current?.pointOfView({ lat: event.lat, lng: event.lng, altitude: size.w < 768 ? 1.12 : 0.92 }, 1000)
-      window.setTimeout(() => onEventSelect?.(event), 200)
+      window.setTimeout(() => onEventInspect?.(event), 120)
     },
-    [onEventSelect, size.w, stopAutoRotate],
+    [focusedEventId, onClearFocus, onEventInspect, scheduleAutoRotateResume, size.w, stopAutoRotate],
   )
 
   // Show tooltip directly in DOM without React state updates
@@ -414,7 +481,10 @@ export default function CrisisGlobe({
   }, [])
 
   return (
-    <div ref={containerRef} className={`relative flex h-full w-full items-center justify-center transition duration-300 ${dimmed ? 'brightness-[0.62]' : 'brightness-100'}`}>
+    <div
+      ref={containerRef}
+      className={`relative flex h-full w-full items-center justify-center transition duration-300 ${dimmed ? 'brightness-[0.62]' : 'brightness-100'} ${isDragging ? 'is-dragging' : ''}`}
+    >
       {size.w > 0 && size.h > 0 ? (
         <Globe
           ref={globeRef}
@@ -427,6 +497,7 @@ export default function CrisisGlobe({
           showAtmosphere
           atmosphereColor="#22D3EE"
           atmosphereAltitude={0.18}
+          onGlobeClick={() => onClearFocus?.()}
           htmlElementsData={visibleEvents}
           htmlLat={(d) => d.lat}
           htmlLng={(d) => d.lng}
@@ -436,44 +507,46 @@ export default function CrisisGlobe({
             el.className = `crisis-pin crisis-pin--${d.severity}`
             el.setAttribute('data-event-id', d.id)
             el.style.pointerEvents = 'auto'
-            el.style.cursor = 'pointer'
-            el.style.zIndex = '10'
-            el.style.transform = `translate(-50%, -50%) scale(${d.id === selectedEventId ? 1.22 : 1})`
-            
+            el.style.transform = `translate(-50%, -50%) scale(${d.id === focusedEventId ? 1.22 : 1})`
+
             el.innerHTML = `
+              <div class="crisis-pin__hit"></div>
               <div class="crisis-pin__halo"></div>
               <div class="crisis-pin__ring"></div>
               <div class="crisis-pin__core"></div>
             `
-            
-            // Click handler
+
+            // Click handler with event prevention
             const handleClick = (event) => {
               event.preventDefault()
               event.stopPropagation()
               handlePinClick(d)
             }
-            
+
             // Hover handlers - these don't trigger React re-renders
             const handleMouseEnter = (event) => {
+              hoveredPinRef.current = true
               showTooltip(d, event)
               onHoverChange?.(d)
             }
-            
+
             const handleMouseMove = (event) => {
               showTooltip(d, event)
             }
-            
+
             const handleMouseLeave = () => {
+              hoveredPinRef.current = false
               hideTooltip()
               onHoverChange?.(null)
+              resumeAutoRotate()
             }
-            
+
             el.addEventListener('click', handleClick, true)
             el.addEventListener('touchend', handleClick, true)
             el.addEventListener('mouseenter', handleMouseEnter, false)
             el.addEventListener('mousemove', handleMouseMove, false)
             el.addEventListener('mouseleave', handleMouseLeave, false)
-            
+
             return el
           }}
           ringsData={visibleEvents}
