@@ -20,28 +20,43 @@ const matchesFilter = (event, filter) => {
 }
 
 export default function TrendingPage({ onOpenEvent, activeEventId }) {
-  const { data: trending, loading } = useTrending()
-  const { data: events } = useEvents()
+  const { data: trending, loading: trendingLoading } = useTrending()
+  const { data: events, loading: eventsLoading } = useEvents()
   const [activeFilter, setActiveFilter] = useState('All')
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState('Latest')
 
   const cards = useMemo(() => {
+    // Primary: Use events from Firestore
+    // Fallback: Link trending articles with events by ID
     const eventMap = new Map(events.map((event) => [event.id, event]))
-
-    return trending
-      .map((item) => {
-        const linked = item.eventId ? eventMap.get(item.eventId) : null
-        if (!linked) return null
-        return {
-          ...linked,
-          title: item.title,
-          previewText: item.previewText,
-          publishedAt: item.publishedAt,
-          outlet: item.outlet,
+    
+    let allCards = []
+    
+    // Add all Firestore events
+    allCards = events.map((event) => ({
+      ...event,
+      publishedAt: event.updatedAt || event.createdAt,
+    }))
+    
+    // Then add any trending articles that don't have a linked event
+    const eventIds = new Set(events.map(e => e.id))
+    trending.forEach((item) => {
+      if (item.eventId && !eventIds.has(item.eventId)) {
+        const linked = eventMap.get(item.eventId)
+        if (linked) {
+          allCards.push({
+            ...linked,
+            title: item.title,
+            previewText: item.previewText,
+            publishedAt: item.publishedAt,
+            outlet: item.outlet,
+          })
         }
-      })
-      .filter(Boolean)
+      }
+    })
+
+    return allCards
       .filter((event) => matchesFilter(event, activeFilter))
       .filter((event) => {
         const term = query.trim().toLowerCase()
@@ -55,7 +70,7 @@ export default function TrendingPage({ onOpenEvent, activeEventId }) {
         }
         return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
       })
-  }, [activeFilter, events, query, sortMode, trending])
+  }, [activeFilter, events, query, sortMode, trending, eventsLoading, trendingLoading])
 
   return (
     <section className="relative z-10 mx-auto max-w-[1280px] px-6 py-16 pb-28">
@@ -103,7 +118,7 @@ export default function TrendingPage({ onOpenEvent, activeEventId }) {
         </div>
       </div>
 
-      {loading ? (
+      {eventsLoading || trendingLoading ? (
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => (
             <Panel key={index} className="overflow-hidden p-0">
@@ -119,7 +134,7 @@ export default function TrendingPage({ onOpenEvent, activeEventId }) {
         </div>
       ) : null}
 
-      {!loading && cards.length ? (
+      {!eventsLoading && !trendingLoading && cards.length ? (
         <motion.div
           className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           initial="hidden"
@@ -147,7 +162,7 @@ export default function TrendingPage({ onOpenEvent, activeEventId }) {
         </motion.div>
       ) : null}
 
-      {!loading && !cards.length ? (
+      {!eventsLoading && !trendingLoading && !cards.length ? (
         <Panel className="mt-8 px-6 py-14 text-center">
           <div className="font-display text-[24px] font-medium text-white">No live matches for this filter</div>
           <div className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
