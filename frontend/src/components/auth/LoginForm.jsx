@@ -1,82 +1,81 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { login } from '../../lib/firebaseAuth'
-import { AlertCircle, Loader } from 'lucide-react'
+import { ArrowRight, Loader } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuthSession } from '../../providers/AuthSessionProvider'
+import { Button } from '../ui/Button'
 
 export const LoginForm = () => {
-  const navigate = useNavigate()
+  const location = useLocation()
+  const { signIn } = useAuthSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(null)
+  const [helper, setHelper] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError(null)
+    setHelper('')
     setLoading(true)
 
     try {
-      await login(email, password)
-      navigate('/')
+      await signIn({ email, password })
     } catch (err) {
-      setError(err.message)
+      setHelper("That combination didn't work yet. Check the email and password, then try again.")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="glass-panel border border-red-500/20 rounded-lg p-4 flex gap-3">
-            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-300">{error}</p>
-          </div>
-        )}
+    <div className="glass-panel rounded-[32px] border-white/8 bg-[linear-gradient(180deg,rgba(18,24,40,0.92),rgba(9,12,20,0.96))] p-6 sm:p-7">
+      <div className="border-b border-white/8 pb-5">
+        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-300">Sign in</div>
+        <h2 className="mt-3 font-display text-[32px] font-semibold tracking-tightish text-white">Welcome back.</h2>
+      </div>
 
+      <form onSubmit={handleSubmit} className="mt-6 space-y-5">
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-white">Email</label>
+          <label className="block text-sm font-medium text-white">Work email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full glass-panel rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-            placeholder="your@email.com"
+            className="w-full rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-cyan-500/35"
+            placeholder="name@company.com"
+            autoComplete="email"
           />
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-white">Password</label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium text-white">Password</label>
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">Case sensitive</span>
+          </div>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full glass-panel rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            className="w-full rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-cyan-500/35"
             placeholder="••••••••"
+            autoComplete="current-password"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-semibold py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
-        >
+        <Button type="submit" disabled={loading} className="w-full justify-center rounded-[18px] py-3 text-[11px]">
           {loading && <Loader className="h-4 w-4 animate-spin" />}
-          {loading ? 'Signing in...' : 'Sign in'}
-        </button>
+          {loading ? 'Opening your account' : 'Continue to account'}
+          {!loading ? <ArrowRight className="h-4 w-4" /> : null}
+        </Button>
 
-        <p className="text-center text-sm text-white/60">
-          Don't have an account?{' '}
-          <button
-            type="button"
-            onClick={() => navigate('/signup')}
-            className="text-cyan-400 hover:text-cyan-300"
-          >
-            Sign up
-          </button>
+        {helper ? <p className="text-sm leading-7 text-cyan-100">{helper}</p> : null}
+
+        <p className="text-sm text-text-secondary">
+          New here?{' '}
+          <Link to="/signup" state={location.state} className="text-cyan-300 transition hover:text-white">
+            Create an account
+          </Link>
         </p>
       </form>
     </div>

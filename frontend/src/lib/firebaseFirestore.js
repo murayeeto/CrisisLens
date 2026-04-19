@@ -2,11 +2,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
-  collection,
-  query,
-  where,
-  getDocs,
   arrayUnion,
   arrayRemove,
   serverTimestamp,
@@ -18,16 +13,15 @@ const USER_SCHEMA = {
   uid: '',
   email: '',
   displayName: '',
+  role: 'member',
   createdAt: '',
   updatedAt: '',
   savedEvents: [],
-  watchlist: [],
   preferences: {
+    countries: [],
     categories: [],
-    regions: [],
-    severityThreshold: 'medium',
-    emailNotifications: true,
   },
+  onboardingCompleted: false,
 }
 
 export const createUserDocument = async (uid, userData) => {
@@ -66,10 +60,10 @@ export const getUserDocument = async (uid) => {
 export const updateUserDocument = async (uid, updates) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, uid)
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       ...updates,
       updatedAt: serverTimestamp(),
-    })
+    }, { merge: true })
   } catch (error) {
     throw new Error(`Failed to update user document: ${error.message}`)
   }
@@ -78,10 +72,10 @@ export const updateUserDocument = async (uid, updates) => {
 export const addSavedEvent = async (uid, eventId) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, uid)
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       savedEvents: arrayUnion(eventId),
       updatedAt: serverTimestamp(),
-    })
+    }, { merge: true })
   } catch (error) {
     throw new Error(`Failed to save event: ${error.message}`)
   }
@@ -90,49 +84,23 @@ export const addSavedEvent = async (uid, eventId) => {
 export const removeSavedEvent = async (uid, eventId) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, uid)
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       savedEvents: arrayRemove(eventId),
       updatedAt: serverTimestamp(),
-    })
+    }, { merge: true })
   } catch (error) {
     throw new Error(`Failed to remove saved event: ${error.message}`)
-  }
-}
-
-export const addToWatchlist = async (uid, watchItem) => {
-  try {
-    const userRef = doc(db, USERS_COLLECTION, uid)
-    await updateDoc(userRef, {
-      watchlist: arrayUnion(watchItem),
-      updatedAt: serverTimestamp(),
-    })
-  } catch (error) {
-    throw new Error(`Failed to add watchlist item: ${error.message}`)
-  }
-}
-
-export const removeFromWatchlist = async (uid, watchItemId) => {
-  try {
-    const userRef = doc(db, USERS_COLLECTION, uid)
-    const userDoc = await getUserDocument(uid)
-    const filteredWatchlist = userDoc.watchlist.filter(item => item.id !== watchItemId)
-    
-    await updateDoc(userRef, {
-      watchlist: filteredWatchlist,
-      updatedAt: serverTimestamp(),
-    })
-  } catch (error) {
-    throw new Error(`Failed to remove watchlist item: ${error.message}`)
   }
 }
 
 export const updateUserPreferences = async (uid, preferences) => {
   try {
     const userRef = doc(db, USERS_COLLECTION, uid)
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       'preferences': preferences,
+      onboardingCompleted: true,
       updatedAt: serverTimestamp(),
-    })
+    }, { merge: true })
   } catch (error) {
     throw new Error(`Failed to update preferences: ${error.message}`)
   }

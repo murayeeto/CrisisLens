@@ -23,6 +23,7 @@ class FirebaseService:
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred, {
                 'projectId': config.FIREBASE_PROJECT_ID,
+                'storageBucket': config.FIREBASE_STORAGE_BUCKET,
             })
             
             cls._db = firestore.client()
@@ -88,7 +89,7 @@ class FirebaseService:
             if not cls._initialized:
                 cls.initialize()
             
-            cls._db.collection('users').document(uid).update(updates)
+            cls._db.collection('users').document(uid).set(updates, merge=True)
             return True
         
         except Exception as e:
@@ -102,9 +103,9 @@ class FirebaseService:
             if not cls._initialized:
                 cls.initialize()
             
-            cls._db.collection('users').document(uid).update({
+            cls._db.collection('users').document(uid).set({
                 'savedEvents': firestore.ArrayUnion([event_id])
-            })
+            }, merge=True)
             return True
         
         except Exception as e:
@@ -118,13 +119,69 @@ class FirebaseService:
             if not cls._initialized:
                 cls.initialize()
             
-            cls._db.collection('users').document(uid).update({
+            cls._db.collection('users').document(uid).set({
                 'savedEvents': firestore.ArrayRemove([event_id])
-            })
+            }, merge=True)
             return True
         
         except Exception as e:
             logger.error(f"Error removing saved event: {e}")
             return False
+
+    @classmethod
+    def get_db(cls):
+        """Return the Firestore client."""
+        if not cls._initialized:
+            cls.initialize()
+        return cls._db
+
+    @classmethod
+    def get_document(cls, collection_name, document_id):
+        """Fetch an arbitrary document by collection and ID."""
+        try:
+            if not cls._initialized:
+                cls.initialize()
+
+            document = cls._db.collection(collection_name).document(document_id).get()
+            return document.to_dict() if document.exists else None
+        except Exception as e:
+            logger.error(f"Error fetching {collection_name}/{document_id}: {e}")
+            return None
+
+    @classmethod
+    def set_document(cls, collection_name, document_id, data, merge=True):
+        """Create or update an arbitrary document."""
+        try:
+            if not cls._initialized:
+                cls.initialize()
+
+            cls._db.collection(collection_name).document(document_id).set(data, merge=merge)
+            return True
+        except Exception as e:
+            logger.error(f"Error setting {collection_name}/{document_id}: {e}")
+            return False
+
+    @classmethod
+    def list_documents(cls, collection_name, filters=None):
+        """List documents from a collection with optional equality filters."""
+        try:
+            if not cls._initialized:
+                cls.initialize()
+
+            query = cls._db.collection(collection_name)
+            for field_name, operator, value in filters or []:
+                query = query.where(field_name, operator, value)
+
+            snapshot = query.stream()
+            return [
+                {
+                    "id": document.id,
+                    **document.to_dict(),
+                }
+                for document in snapshot
+            ]
+        except Exception as e:
+            logger.error(f"Error listing documents from {collection_name}: {e}")
+            return []
 
 firebase_service = FirebaseService()

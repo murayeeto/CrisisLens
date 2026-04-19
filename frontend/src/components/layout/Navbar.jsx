@@ -1,19 +1,40 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Search } from 'lucide-react'
-import { Link, NavLink } from 'react-router-dom'
+import { ChevronDown, Search } from 'lucide-react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { openCommandPalette } from '../../hooks/useCommandPalette'
+import { useAuthSession } from '../../providers/AuthSessionProvider'
 import { Kbd } from '../ui/Kbd'
 import { BrandMark } from './BrandBadge'
 
 const links = [
   { to: '/', label: 'Home' },
   { to: '/trending', label: 'Trending' },
-  { to: '/account', label: 'Account' },
+  { to: '/for-you', label: 'For You' },
 ]
 
+function getAccountInitials(profile) {
+  const displayName = profile?.displayName?.trim()
+
+  if (displayName) {
+    const parts = displayName.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+      return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase()
+    }
+    return (parts[0]?.[0] ?? 'C').toUpperCase()
+  }
+
+  const fallback = profile?.email?.trim()?.[0] ?? 'C'
+  return fallback.toUpperCase()
+}
+
 export function Navbar() {
+  const location = useLocation()
   const [scrolled, setScrolled] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const desktopAccountMenuRef = useRef(null)
+  const mobileAccountMenuRef = useRef(null)
+  const { isAuthenticated, profile } = useAuthSession()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12)
@@ -21,6 +42,23 @@ export function Navbar() {
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      const clickedDesktopMenu = desktopAccountMenuRef.current?.contains(event.target)
+      const clickedMobileMenu = mobileAccountMenuRef.current?.contains(event.target)
+
+      if (!clickedDesktopMenu && !clickedMobileMenu) {
+        setAccountOpen(false)
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  const initials = getAccountInitials(profile)
+  const accountActive = location.pathname === '/account'
 
   return (
     <motion.header
@@ -41,14 +79,85 @@ export function Navbar() {
             <NavLink
               key={link.to}
               to={link.to}
-              className="inline-flex items-center rounded-full px-4 py-1.5 text-[13px] font-medium uppercase tracking-[0.14em] text-text-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-white"
+              className={({ isActive }) =>
+                `inline-flex items-center rounded-full px-4 py-1.5 text-[13px] font-medium uppercase tracking-[0.14em] transition-colors duration-150 hover:bg-white/[0.04] hover:text-white ${
+                  isActive ? 'bg-white/[0.05] text-white' : 'text-text-muted'
+                }`
+              }
             >
               {link.label}
             </NavLink>
           ))}
+
+          {isAuthenticated ? (
+            <div className="relative" ref={desktopAccountMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAccountOpen((current) => !current)}
+                aria-label="Open account menu"
+                className={`inline-flex h-11 items-center justify-center gap-1 rounded-full bg-transparent p-0 ${
+                  accountActive ? 'text-cyan-300' : 'text-text-secondary'
+                }`}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/[0.12] font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">
+                  {initials}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+
+              {accountOpen ? (
+                <div className="absolute left-0 top-[calc(100%+10px)] w-[200px] rounded-[22px] border border-white/10 bg-[rgba(9,12,20,0.96)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+                  <Link
+                    to="/account"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex w-full items-center justify-center rounded-[16px] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.06]"
+                  >
+                    View Account
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          {isAuthenticated ? (
+            <div className="relative md:hidden" ref={mobileAccountMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAccountOpen((current) => !current)}
+                aria-label="Open account menu"
+                className={`inline-flex h-11 items-center justify-center gap-1 rounded-full bg-transparent p-0 ${
+                  accountActive ? 'text-cyan-300' : 'text-text-secondary'
+                }`}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/[0.12] font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300">
+                  {initials}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+
+              {accountOpen ? (
+                <div className="absolute right-0 top-[calc(100%+10px)] w-[220px] rounded-[22px] border border-white/10 bg-[rgba(9,12,20,0.96)] p-3 shadow-[0_18px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+                  <Link
+                    to="/account"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex w-full items-center justify-center rounded-[16px] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.06]"
+                  >
+                    View Account
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="glass-panel glass-panel--interactive hidden rounded-full px-4 py-2 font-mono text-[11px] uppercase tracking-[0.14em] text-cyan-300 md:inline-flex"
+            >
+              Sign in
+            </Link>
+          )}
+
           <button
             type="button"
             onClick={openCommandPalette}
