@@ -17,88 +17,112 @@ WORLD_LOCATIONS = {
     "denver": "Denver, USA",
     "boston": "Boston, USA",
     "new orleans": "New Orleans, USA",
+    "norman": "Norman, Oklahoma, USA",
+    "bay area": "Bay Area, California, USA",
+    "sumatra": "Sumatra, Indonesia",
+    "northern sumatra": "Northern Sumatra, Indonesia",
     
-    # International
+    # Canada
+    "canada": "Canada",
+    "ontario": "Ontario, Canada",
+    "quebec": "Quebec, Canada",
+    "british columbia": "British Columbia, Canada",
+    "bc": "British Columbia, Canada",
+    "west nipissing": "West Nipissing, Ontario, Canada",
+    "peguis": "Peguis, Manitoba, Canada",
+    "nova scotia": "Nova Scotia, Canada",
+    
+    # International - Europe
     "london": "London, UK",
     "paris": "Paris, France",
+    "uk": "United Kingdom",
+    "united kingdom": "United Kingdom",
+    "england": "England, UK",
+    "scotland": "Scotland, UK",
+    "ireland": "Ireland",
+    "venice": "Venice, Italy",
+    "italy": "Italy",
+    "italy": "Italy",
+    "prague": "Prague, Czech Republic",
+    "czechia": "Czech Republic",
+    "czech republic": "Czech Republic",
+    "ukraine": "Ukraine",
+    "kyiv": "Kyiv, Ukraine",
+    "russia": "Russia",
+    "moscow": "Moscow, Russia",
+    "peak district": "Peak District, UK",
+    
+    # Middle East & Asia
+    "dubai": "Dubai, UAE",
+    "uae": "United Arab Emirates",
+    "united arab emirates": "United Arab Emirates",
+    "istanbul": "Istanbul, Turkey",
+    "turkey": "Turkey",
+    "iran": "Iran",
+    "iraq": "Iraq",
+    "middle east": "Middle East",
+    
+    # Asia
     "tokyo": "Tokyo, Japan",
     "beijing": "Beijing, China",
     "shanghai": "Shanghai, China",
     "mumbai": "Mumbai, India",
     "delhi": "Delhi, India",
+    "india": "India",
+    "odisha": "Odisha, India",
     "bangalore": "Bangalore, India",
+    "thailand": "Thailand",
+    "bangkok": "Bangkok, Thailand",
+    "pai": "Pai, Thailand",
+    "singapore": "Singapore",
+    "hong kong": "Hong Kong",
+    "taiwan": "Taiwan",
+    "philippines": "Philippines",
+    "manila": "Manila, Philippines",
+    "south korea": "South Korea",
+    "north korea": "North Korea",
+    "vietnam": "Vietnam",
+    "malaysia": "Malaysia",
+    "indonesia": "Indonesia",
+    "java": "Java, Indonesia",
+    "merapi": "Mount Merapi, Indonesia",
+    "jakarta": "Jakarta, Indonesia",
+    "chernobyl": "Chernobyl, Ukraine",
+    
+    # Africa
+    "egypt": "Egypt",
+    "cairo": "Cairo, Egypt",
+    "south africa": "South Africa",
+    "johannesburg": "Johannesburg, South Africa",
+    "cape town": "Cape Town, South Africa",
+    "kenya": "Kenya",
+    "nairobi": "Nairobi, Kenya",
+    "nigeria": "Nigeria",
+    "uyo": "Uyo, Nigeria",
+    "akwa ibom": "Akwa Ibom State, Nigeria",
+    
+    # Australia & Pacific
+    "australia": "Australia",
     "sydney": "Sydney, Australia",
     "melbourne": "Melbourne, Australia",
     "brisbane": "Brisbane, Australia",
-    "dubai": "Dubai, UAE",
-    "bangkok": "Bangkok, Thailand",
-    "singapore": "Singapore",
-    "hong kong": "Hong Kong",
-    "moscow": "Moscow, Russia",
-    "istanbul": "Istanbul, Turkey",
-    "toronto": "Toronto, Canada",
-    "vancouver": "Vancouver, Canada",
-    "mexico city": "Mexico City, Mexico",
+    "queensland": "Queensland, Australia",
+    "new zealand": "New Zealand",
+    
+    # South America
+    "brazil": "Brazil",
     "são paulo": "São Paulo, Brazil",
     "rio de janeiro": "Rio de Janeiro, Brazil",
-    "buenos aires": "Buenos Aires, Argentina",
-    "cairo": "Cairo, Egypt",
-    "johannesburg": "Johannesburg, South Africa",
-    "cape town": "Cape Town, South Africa",
-    "nairobi": "Nairobi, Kenya",
-    "manila": "Manila, Philippines",
-    "bangkok": "Bangkok, Thailand",
-    "seoul": "Seoul, South Korea",
-    "amsterdam": "Amsterdam, Netherlands",
-    "berlin": "Berlin, Germany",
-    "madrid": "Madrid, Spain",
-    "rome": "Rome, Italy",
-    "barcelona": "Barcelona, Spain",
-    "toronto": "Toronto, Canada",
     "mexico": "Mexico",
-    "canada": "Canada",
-    "brazil": "Brazil",
+    "mexico city": "Mexico City, Mexico",
     "argentina": "Argentina",
-    "india": "India",
-    "china": "China",
-    "japan": "Japan",
-    "thailand": "Thailand",
-    "vietnam": "Vietnam",
-    "pakistan": "Pakistan",
-    "nepal": "Nepal",
-    "bangladesh": "Bangladesh",
-    "sri lanka": "Sri Lanka",
-    "indonesia": "Indonesia",
-    "malaysia": "Malaysia",
-    "philippines": "Philippines",
-    "south korea": "South Korea",
-    "north korea": "North Korea",
-    "germany": "Germany",
-    "france": "France",
-    "italy": "Italy",
-    "spain": "Spain",
-    "uk": "United Kingdom",
-    "united kingdom": "United Kingdom",
-    "ireland": "Ireland",
-    "greece": "Greece",
-    "poland": "Poland",
-    "ukraine": "Ukraine",
-    "russia": "Russia",
-    "turkey": "Turkey",
-    "middle east": "Middle East",
-    "africa": "Africa",
-    "europe": "Europe",
-    "asia": "Asia",
-    "north america": "North America",
-    "south america": "South America",
-    "australia": "Australia",
-    "new zealand": "New Zealand",
+    "buenos aires": "Buenos Aires, Argentina",
 }
 
 def extract_location_from_text(text: str) -> str:
     """
-    Extract real location from ANY article text.
-    Works with real news articles to find where events are happening.
+    Extract real location from article text.
+    Uses multiple strategies to find actual crisis locations mentioned in articles.
     """
     if not text:
         return ""
@@ -107,38 +131,43 @@ def extract_location_from_text(text: str) -> str:
     text_lower = text.lower()
     text_first_2000 = text[:2000]  # Look in first 2000 chars for main info
     
-    # 1. Check for exact location keyword matches (highest priority)
-    for keyword, location_name in WORLD_LOCATIONS.items():
+    # STRATEGY 1: Check for exact location keyword matches (highest priority)
+    # Sort by keyword length (longest first) to avoid partial matches
+    sorted_keywords = sorted(WORLD_LOCATIONS.items(), key=lambda x: len(x[0]), reverse=True)
+    for keyword, location_name in sorted_keywords:
         if keyword in text_lower:
             return location_name
     
-    # 2. Look for "City, State" or "City, Country" pattern
-    city_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*([A-Z]{2}|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b'
-    match = re.search(city_pattern, text_first_2000)
-    if match:
+    # STRATEGY 2: Look for specific "City, State" or "City, Country" patterns
+    # This catches formats like "Tokyo, Japan" or "New York, NY"
+    city_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]*)*)\s*,\s*([A-Z][a-z]*(?:\s+[A-Z][a-z]*)?)\b'
+    for match in re.finditer(city_pattern, text_first_2000):
         city = match.group(1)
         state_or_country = match.group(2)
-        return f"{city}, {state_or_country}"
+        combined = f"{city}, {state_or_country}".lower()
+        # Only return if this looks like a real location
+        if len(city) > 3 and len(state_or_country) > 2:
+            return f"{city}, {state_or_country}"
     
-    # 3. Look for location context clues (City + action verb)
-    location_context = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:hit|struck|affected|damaged|destroyed|flooded|evacuated|emergency|disaster|alert|warning)\b'
-    match = re.search(location_context, text_first_2000, re.IGNORECASE)
-    if match:
-        potential_location = match.group(1)
-        if len(potential_location) > 3:
-            return potential_location
+    # STRATEGY 3: For articles that mention a crisis type, try to match locations near crisis keywords
+    # This helps catch articles where the location might not be obvious
+    crisis_keywords = ['earthquake', 'flood', 'fire', 'hurricane', 'tornado', 'disaster', 
+                       'evacuation', 'emergency', 'crisis', 'explosion', 'storm', 'volcanic',
+                       'tsunami', 'accident', 'incident', 'war', 'attack', 'pollution', 'alert']
     
-    # 4. Try to find any capitalized phrase that looks like a location
-    capitalized_phrases = re.finditer(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b', text_first_2000)
-    for match in capitalized_phrases:
-        phrase = match.group(1)
-        # Filter out common non-location words
-        stopwords = {'The', 'A', 'An', 'In', 'At', 'From', 'To', 'And', 'Or', 'This', 'That', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'}
-        if phrase not in stopwords and len(phrase) > 3:
-            # Check if it's a recognized location keyword
-            if any(keyword in phrase.lower() for keyword in WORLD_LOCATIONS.keys()):
-                return phrase
+    for crisis_word in crisis_keywords:
+        if crisis_word in text_lower:
+            crisis_pos = text_lower.find(crisis_word)
+            # Look for location keywords within 150 chars before or after the crisis word
+            search_start = max(0, crisis_pos - 150)
+            search_end = min(len(text), crisis_pos + 150)
+            nearby_text = text_lower[search_start:search_end]
+            
+            for keyword, location_name in sorted_keywords:
+                if keyword in nearby_text and len(keyword) > 2:
+                    return location_name
     
+    # STRATEGY 4: Return empty - geocoding service will handle default
     return ""
 
 def clean_location_name(location: str) -> str:

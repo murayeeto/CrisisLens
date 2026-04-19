@@ -1,10 +1,13 @@
 import { severityOrder, getSeverityConfig } from '../../lib/severity'
 
 export function GlobeLegend({ activeSeverities, onToggle }) {
+  // When no severities are selected, all events are shown (default behavior)
+  // Users can click buttons to filter to specific severities only
   return (
     <div className="glass-panel flex flex-wrap items-center gap-3 rounded-full px-4 py-3">
       {severityOrder.map((severity) => {
         const config = getSeverityConfig(severity)
+        // Show as active if: no filters selected (show all) OR this severity is explicitly selected
         const active = activeSeverities.length === 0 || activeSeverities.includes(severity)
 
         return (

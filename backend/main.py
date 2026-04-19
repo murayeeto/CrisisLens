@@ -50,17 +50,59 @@ def health():
 # API Routes with /api prefix
 @app.route('/api/events', methods=['GET'])
 def get_events():
-    """Fetch events from news service and return as structured events."""
+    """Fetch events from Firestore first, then generate new ones if needed."""
     logger.info("Get events endpoint called")
     try:
-        # Fetch trending news articles
+        # STRATEGY 1: Try to load events from Firestore (persistent storage)
+        logger.info("Attempting to load events from Firestore...")
+        try:
+            db = FirebaseService._db
+            firestore_events = []
+            
+            # Query all events from Firestore
+            docs = db.collection('events').stream()
+            for doc in docs:
+                event_data = doc.to_dict()
+                firestore_events.append({
+                    "id": event_data.get('id'),
+                    "title": event_data.get('title'),
+                    "description": event_data.get('description'),
+                    "severity": event_data.get('severity', 'info'),
+                    "category": event_data.get('category', 'other'),
+                    "region": event_data.get('region', 'Unknown'),
+                    "location": event_data.get('location', 'Unknown'),
+                    "lat": float(event_data.get('lat', 0)),
+                    "lng": float(event_data.get('lng', 0)),
+                    "timestamp": event_data.get('createdAt', ''),
+                    "startedAt": event_data.get('createdAt', ''),
+                    "updatedAt": event_data.get('updatedAt', ''),
+                    "previewImage": event_data.get('previewImage', ''),
+                    "aiSummary": event_data.get('aiSummary', event_data.get('description', '')),
+                    "affectedGroups": event_data.get('affectedGroups', []),
+                    "impactAnalysis": event_data.get('impactAnalysis', ''),
+                    "howToHelp": event_data.get('howToHelp', ''),
+                    "watchGuidance": event_data.get('watchGuidance', ''),
+                    "sources": event_data.get('sources', []),
+                    "sourcesCount": len(event_data.get('sources', [])),
+                })
+            
+            if firestore_events:
+                logger.info(f"✓ Loaded {len(firestore_events)} events from Firestore")
+                return jsonify(firestore_events), 200
+            else:
+                logger.info("No events found in Firestore, will generate new ones")
+        except Exception as e:
+            logger.warning(f"Could not load from Firestore: {e}, generating new events...")
+        
+        # STRATEGY 2: If Firestore empty, fetch trending news articles and create events
+        logger.info("Fetching trending news articles...")
         articles = news_service.fetch_trending_news()
         
         if not articles:
             logger.warning("No articles available from news service")
             return jsonify([]), 200
         
-        # Convert articles to events
+        # Convert articles to events and store in Firestore
         events = []
         for article in articles[:20]:  # Limit to 20 events
             try:
@@ -73,7 +115,7 @@ def get_events():
                     logger.warning(f"Event {event.id} has no location, skipping")
                     continue
                 
-                events.append({
+                event_dict = {
                     "id": event.id,
                     "title": event.title,
                     "description": event.description,
@@ -94,7 +136,35 @@ def get_events():
                     "watchGuidance": event.ai_analysis.watch_guidance if event.ai_analysis else "",
                     "sources": [{"name": article.source_name, "url": article.url}],
                     "sourcesCount": 1,
-                })
+                }
+                events.append(event_dict)
+                
+                # Store in Firestore for persistence
+                try:
+                    db = FirebaseService._db
+                    db.collection('events').document(event.id).set({
+                        'id': event.id,
+                        'title': event.title,
+                        'description': event.description,
+                        'category': event_dict['category'],
+                        'severity': event_dict['severity'],
+                        'location': event.location.name if event.location else "Unknown",
+                        'lat': event_dict['lat'],
+                        'lng': event_dict['lng'],
+                        'previewImage': event.image_url or "",
+                        'aiSummary': event_dict['aiSummary'],
+                        'affectedGroups': event_dict['affectedGroups'],
+                        'impactAnalysis': event_dict['impactAnalysis'],
+                        'howToHelp': event_dict['howToHelp'],
+                        'watchGuidance': event_dict['watchGuidance'],
+                        'sources': event_dict['sources'],
+                        'createdAt': event.created_at.isoformat(),
+                        'updatedAt': event.updated_at.isoformat(),
+                    })
+                    logger.info(f"Event {event.id} stored in Firestore")
+                except Exception as e:
+                    logger.warning(f"Could not store event in Firestore: {e}")
+                
                 logger.info(f"Event converted successfully")
             except Exception as e:
                 logger.error(f"Error converting article to event: {e}", exc_info=True)

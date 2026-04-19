@@ -33,6 +33,9 @@ function AppLayout() {
   const location = useLocation()
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [activeSeverities, setActiveSeverities] = useState([])
+  
+  // By default, show all events (no severity filtering)
+  // The legend buttons allow users to filter if desired
 
   const openEvent = useCallback((id) => setSelectedEventId(id), [])
   const closeEvent = useCallback(() => setSelectedEventId(null), [])

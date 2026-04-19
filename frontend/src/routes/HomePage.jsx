@@ -59,8 +59,16 @@ export default function HomePage({
     }
   }, [detailEventId])
 
+  // Always show all events - severity filtering is optional via legend buttons
   const visibleEvents = useMemo(
-    () => (activeSeverities.length ? events.filter((event) => activeSeverities.includes(event.severity)) : events),
+    () => {
+      // If no severities are active (empty array), show ALL events
+      // If severities are selected, only show those
+      if (activeSeverities.length === 0) {
+        return events // Show all events by default
+      }
+      return events.filter((event) => activeSeverities.includes(event.severity))
+    },
     [activeSeverities, events],
   )
   const detailEvent = useMemo(() => events.find((event) => event.id === detailEventId) ?? null, [detailEventId, events])

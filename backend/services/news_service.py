@@ -110,6 +110,46 @@ MOCK_ARTICLES = [
 
 class NewsService:
     @staticmethod
+    def _is_quality_article(article: NewsArticle) -> bool:
+        """
+        Check if article has good content quality.
+        Filters out articles with severe title/description mismatches.
+        """
+        if not article.title or not article.description:
+            return False
+        
+        title_lower = article.title.lower()
+        desc_lower = article.description.lower()
+        
+        # Severe mismatch detection: title mentions one thing, description mentions something completely different
+        # E.g., "Golfer" in title but "Rugby League" in description
+        sports_types = {
+            'golf': ['pga', 'golfer', 'golf tour', 'hole'],
+            'rugby': ['rugby league', 'rugby union', 'dragons', 'flanagan'],
+            'soccer': ['football', 'soccer', 'premier league'],
+            'basketball': ['basketball', 'nba'],
+        }
+        
+        # Check for sport type mismatches
+        for sport1, keywords1 in sports_types.items():
+            if any(kw in title_lower for kw in keywords1):
+                # Title is about this sport
+                for sport2, keywords2 in sports_types.items():
+                    if sport1 != sport2 and any(kw in desc_lower for kw in keywords2):
+                        # Description is about a different sport - MISMATCH
+                        logger.warning(f"Skipping article: '{sport1}' title but '{sport2}' description")
+                        return False
+        
+        # Check for Cyrillic-only articles (hard to parse locations)
+        cyrillic_chars = sum(1 for c in desc_lower if ord(c) > 0x0400 and ord(c) <= 0x04FF)
+        if len(desc_lower) > 20 and cyrillic_chars > len(desc_lower) * 0.7:
+            # More than 70% Cyrillic text - likely Russian/Ukrainian with no English locations
+            logger.warning(f"Skipping Cyrillic-heavy article: {article.title[:50]}")
+            return False
+        
+        return True
+    
+    @staticmethod
     def fetch_trending_news() -> List[NewsArticle]:
         """Fetch trending news from newsapi.ai - ALWAYS use real API data, never mock."""
         
@@ -191,10 +231,23 @@ class NewsService:
                                 content=article.get("body", "")
                             )
                             
-                            # Check if article already exists (by URL) to avoid duplicates
-                            if not any(a.url == normalized.url for a in all_articles):
+                            # Check if article already exists (by URL or title) to avoid duplicates
+                            is_duplicate = any(
+                                a.url == normalized.url or 
+                                (a.title.lower() == normalized.title.lower() and a.title)  # Check title if both exist
+                                for a in all_articles
+                            )
+                            
+                            # Check for content quality - skip articles with severe mismatches
+                            # (e.g., golf title with rugby description)
+                            if not is_duplicate and NewsService._is_quality_article(normalized):
                                 all_articles.append(normalized)
                                 logger.info(f"✓ Added article: {normalized.title[:60]}")
+                            else:
+                                if is_duplicate:
+                                    logger.info(f"⊘ Skipped duplicate: {normalized.title[:60]}")
+                                else:
+                                    logger.info(f"⊘ Skipped low-quality: {normalized.title[:60]} (mismatched content)")
                         except Exception as e:
                             logger.warning(f"Error parsing article: {e}")
                             continue
