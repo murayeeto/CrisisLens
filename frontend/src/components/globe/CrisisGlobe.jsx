@@ -352,7 +352,7 @@ export default function CrisisGlobe({
       controls = globeRef.current?.controls?.()
       if (!controls) return
       controls.autoRotate = !reducedMotion && !dimmed
-      controls.autoRotateSpeed = size.w < 768 ? 0.16 : 0.2
+      controls.autoRotateSpeed = size.w < 768 ? 0.26 : 0.34
       controls.enablePan = false
       controls.enableDamping = true
       controls.dampingFactor = 0.08
