@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PreferenceEditor } from '../components/auth/PreferenceEditor'
 import { ReliefCampaignCard } from '../components/relief/ReliefCampaignCard'
+import { EventDetailPanel } from '../components/event/EventDetailPanel'
 import { ProfileHeader } from '../components/user/ProfileHeader'
+import { SavedEventsGrid } from '../components/user/SavedEventsGrid'
 import { Button } from '../components/ui/Button'
 import { Panel } from '../components/ui/Panel'
 import { useCampaignReviewQueue, useMyCampaigns } from '../hooks/useCampaigns'
@@ -28,6 +30,9 @@ export default function AccountPage() {
   const [preferencesHelper, setPreferencesHelper] = useState('')
   const [reviewActionId, setReviewActionId] = useState('')
   const [reviewHelper, setReviewHelper] = useState('')
+  const [savedEvents, setSavedEvents] = useState([])
+  const [savedLoading, setSavedLoading] = useState(false)
+  const [selectedEventId, setSelectedEventId] = useState(null)
   const { data: campaigns, loading: campaignsLoading } = useMyCampaigns(idToken)
   const { data: reviewQueue, loading: reviewQueueLoading, refetch: refetchReviewQueue } = useCampaignReviewQueue(
     profile?.role === 'reviewer' ? idToken : null,
@@ -40,6 +45,42 @@ export default function AccountPage() {
     })
     setLanguageDraft(profile?.language ?? 'en')
   }, [profile?.preferences?.categories, profile?.preferences?.countries, profile?.language])
+
+  useEffect(() => {
+    let active = true
+
+    if (!idToken) {
+      setSavedEvents([])
+      setSavedLoading(false)
+      return () => {
+        active = false
+      }
+    }
+
+    setSavedLoading(true)
+
+    api
+      .getSavedEvents({ token: idToken })
+      .then((response) => {
+        if (!active) return
+        setSavedEvents(Array.isArray(response) ? response : [])
+      })
+      .catch((error) => {
+        console.error('Failed to fetch saved events:', error)
+        if (active) {
+          setSavedEvents([])
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setSavedLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [idToken])
 
   const preferencesChanged =
     JSON.stringify(preferencesDraft) !==
@@ -99,6 +140,18 @@ export default function AccountPage() {
       setReviewHelper(error?.body?.error || error.message || 'Could not save review.')
     } finally {
       setReviewActionId('')
+    }
+  }
+
+  const handleOpenEvent = (eventId) => {
+    setSelectedEventId(eventId)
+  }
+
+  const handleToggleSave = async (eventId) => {
+    try {
+      await updateAccount({ savedEvents: Array.isArray(profile?.savedEvents) ? profile.savedEvents : [] })
+    } catch (error) {
+      console.error('Failed to update saved events:', error)
     }
   }
 
@@ -300,6 +353,46 @@ export default function AccountPage() {
           </Panel>
         </div>
       ) : null}
+
+      <div className="mt-8">
+        <Panel className="p-6 md:p-7">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-300">Articles</div>
+              <h2 className="mt-3 font-display text-[30px] font-semibold tracking-tightish text-white md:text-[36px]">
+                Saved articles
+              </h2>
+            </div>
+          </div>
+
+          {savedLoading ? (
+            <div className="mt-6 text-sm text-text-secondary">Loading saved articles…</div>
+          ) : null}
+
+          {!savedLoading && savedEvents.length ? (
+            <div className="mt-6">
+              <SavedEventsGrid 
+                events={savedEvents} 
+                onOpenEvent={handleOpenEvent} 
+                onToggleSave={handleToggleSave}
+              />
+            </div>
+          ) : null}
+
+          {!savedLoading && !savedEvents.length ? (
+            <div className="mt-6 rounded-[22px] border border-white/8 bg-white/[0.03] px-5 py-5">
+              <div className="font-display text-[22px] text-white">No saved articles yet.</div>
+              <div className="mt-2 text-sm leading-7 text-text-secondary">
+                Bookmark articles from the feed to keep them for later.
+              </div>
+            </div>
+          ) : null}
+        </Panel>
+      </div>
+
+      {selectedEventId && (
+        <EventDetailPanel eventId={selectedEventId} onClose={() => setSelectedEventId(null)} />
+      )}
     </section>
   )
 }
