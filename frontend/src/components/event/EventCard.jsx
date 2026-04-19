@@ -3,6 +3,22 @@ import { formatTimeAgo, makeFallbackImage } from '../../lib/format'
 import { SeverityBadge } from './SeverityBadge'
 import { Panel } from '../ui/Panel'
 
+function getHighlightClass(tone = 'neutral') {
+  if (tone === 'match') {
+    return 'border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-100'
+  }
+
+  if (tone === 'saved') {
+    return 'border-blue-500/20 bg-blue-500/[0.08] text-blue-100'
+  }
+
+  if (tone === 'critical') {
+    return 'border-red-500/20 bg-red-500/[0.08] text-red-100'
+  }
+
+  return 'border-white/10 bg-white/[0.04] text-text-secondary'
+}
+
 export function EventCard({
   event,
   onClick,
@@ -11,6 +27,7 @@ export function EventCard({
   onToggleSave,
   active = false,
   note,
+  highlights = [],
 }) {
   const fallbackImage = makeFallbackImage(event.title, event.severity === 'critical' ? '#EF4444' : '#22D3EE')
 
@@ -67,6 +84,21 @@ export function EventCard({
             <span className="line-clamp-2">{event.aiSummary}</span>
           </div>
         )}
+        {note ? (
+          <p className="mt-3 text-[12px] leading-6 text-cyan-100/80">{note}</p>
+        ) : null}
+        {highlights.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {highlights.slice(0, 3).map((highlight) => (
+              <span
+                key={`${event.id}-${highlight.label}`}
+                className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] ${getHighlightClass(highlight.tone)}`}
+              >
+                {highlight.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {event.affectedGroups && event.affectedGroups.length > 0 && !event.aiSummary && (
           <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-500/15 bg-cyan-500/[0.08] px-2.5 py-1 text-[11px] text-cyan-100/90">
             <Sparkles className="h-3.5 w-3.5 text-cyan-400" />

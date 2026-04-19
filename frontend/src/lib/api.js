@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 const API_TIMEOUT = 45000 // 45 seconds for real API calls (needs time for geocoding + AI analysis)
 
 async function fetch_api(path, options = {}) {
@@ -8,18 +8,30 @@ async function fetch_api(path, options = {}) {
   }, API_TIMEOUT)
 
   try {
+    const { token, headers: customHeaders, ...requestOptions } = options
     const response = await fetch(`${BASE_URL}${path}`, {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...options.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...customHeaders,
       },
-      ...options,
+      ...requestOptions,
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      let errorBody = null
+      try {
+        errorBody = await response.json()
+      } catch (_error) {
+        errorBody = null
+      }
+
+      const error = new Error(errorBody?.error || `HTTP ${response.status}: ${response.statusText}`)
+      error.status = response.status
+      error.body = errorBody
+      throw error
     }
 
     return await response.json()
@@ -39,8 +51,50 @@ export const api = {
   getEvents: () => fetch_api('/api/events'),
   getEvent: (id) => fetch_api(`/api/events/${id}`),
   getTrending: () => fetch_api('/api/news/trending'),
-  getMe: () => fetch_api('/api/auth/me'),
-  getSavedEvents: () => fetch_api('/api/users/saved-events'),
-  saveEvent: (eventId) => fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'POST' }),
-  unsaveEvent: (eventId) => fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'DELETE' }),
+  getCampaigns: ({ eventId, includeInactive } = {}) => {
+    const params = new URLSearchParams()
+    if (eventId) params.set('eventId', eventId)
+    if (includeInactive) params.set('includeInactive', 'true')
+    const search = params.toString()
+    return fetch_api(`/api/campaigns${search ? `?${search}` : ''}`)
+  },
+  getCampaign: (campaignId) => fetch_api(`/api/campaigns/${campaignId}`),
+  getMyCampaigns: ({ token } = {}) => fetch_api('/api/campaigns/me', { token }),
+  getCampaignReviewQueue: ({ token } = {}) => fetch_api('/api/campaigns/review-queue', { token }),
+  createCampaign: (payload, { token } = {}) =>
+    fetch_api('/api/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  updateCampaign: (campaignId, payload, { token } = {}) =>
+    fetch_api(`/api/campaigns/${campaignId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  reviewCampaign: (campaignId, payload, { token } = {}) =>
+    fetch_api(`/api/campaigns/${campaignId}/review`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  createCampaignCheckoutSession: (campaignId, payload) =>
+    fetch_api(`/api/campaigns/${campaignId}/checkout-session`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getDonationSession: (sessionId) => fetch_api(`/api/donations/session/${sessionId}`),
+  getMe: ({ token } = {}) => fetch_api('/api/users/me', { token }),
+  updateMe: (payload, { token } = {}) =>
+    fetch_api('/api/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      token,
+    }),
+  getSavedEvents: ({ token } = {}) => fetch_api('/api/users/me/saved-events', { token }),
+  saveEvent: (eventId, { token } = {}) =>
+    fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'POST', token }),
+  unsaveEvent: (eventId, { token } = {}) =>
+    fetch_api(`/api/users/me/saved-events/${eventId}`, { method: 'DELETE', token }),
 }

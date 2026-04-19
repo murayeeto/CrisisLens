@@ -3,6 +3,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updateProfile,
 } from 'firebase/auth'
 import { auth } from './firebase'
 import { createUserDocument } from './firebaseFirestore'
@@ -11,13 +12,22 @@ export const signup = async (email, password, displayName) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password)
     const user = userCredential.user
+
+    if (displayName) {
+      await updateProfile(user, { displayName })
+    }
     
     await createUserDocument(user.uid, {
       email,
       displayName,
+      role: 'member',
       createdAt: new Date().toISOString(),
       savedEvents: [],
-      watchlist: [],
+      preferences: {
+        countries: [],
+        categories: [],
+      },
+      onboardingCompleted: false,
     })
     
     return user

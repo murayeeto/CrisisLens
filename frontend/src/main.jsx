@@ -8,10 +8,13 @@ import '@fontsource/space-grotesk/500.css'
 import '@fontsource/space-grotesk/700.css'
 import './index.css'
 import App from './App'
+import { AuthSessionProvider } from './providers/AuthSessionProvider'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <AuthSessionProvider>
+      <App />
+    </AuthSessionProvider>
   </React.StrictMode>,
 )
 

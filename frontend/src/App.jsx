@@ -11,10 +11,17 @@ import { Navbar } from './components/layout/Navbar'
 import { TickerBar } from './components/layout/TickerBar'
 import { CommandPalette } from './components/layout/CommandPalette'
 import { EventDetailPanel } from './components/event/EventDetailPanel'
+import { RequireAccountAccess } from './components/auth/RequireAccountAccess'
 import HomePage from './routes/HomePage'
 import TrendingPage from './routes/TrendingPage'
 import UserPage from './routes/UserPage'
+import AccountPage from './routes/AccountPage'
 import NotFoundPage from './routes/NotFoundPage'
+import { LoginPage } from './routes/LoginPage'
+import { SignupPage } from './routes/SignupPage'
+import OnboardingPage from './routes/OnboardingPage'
+import ReliefCreatePage from './routes/ReliefCreatePage'
+import ReliefCampaignPage from './routes/ReliefCampaignPage'
 
 function RouteFrame({ children }) {
   return (
@@ -33,6 +40,8 @@ function AppLayout() {
   const location = useLocation()
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [activeSeverities, setActiveSeverities] = useState([])
+  const immersiveRoute = ['/login', '/signup', '/onboarding'].includes(location.pathname)
+  const reliefRoute = location.pathname.startsWith('/relief')
 
   const openEvent = useCallback((id) => setSelectedEventId(id), [])
   const closeEvent = useCallback(() => setSelectedEventId(null), [])
@@ -61,13 +70,43 @@ function AppLayout() {
     }
   }, [location.search])
 
+  useEffect(() => {
+    if (reliefRoute) {
+      setSelectedEventId(null)
+    }
+  }, [reliefRoute])
+
   return (
     <>
       <BackgroundFX />
-      <Navbar />
-      <main className="relative z-10 min-h-screen pt-16">
+      {!immersiveRoute ? <Navbar /> : null}
+      <main className={`relative z-10 min-h-screen ${immersiveRoute ? '' : 'pt-16'}`}>
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
+            <Route
+              path="/login"
+              element={
+                <RouteFrame>
+                  <LoginPage />
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <RouteFrame>
+                  <SignupPage />
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <RouteFrame>
+                  <OnboardingPage />
+                </RouteFrame>
+              }
+            />
             <Route
               path="/"
               element={
@@ -91,10 +130,38 @@ function AppLayout() {
               }
             />
             <Route
+              path="/for-you"
+              element={
+                <RouteFrame>
+                  <RequireAccountAccess>
+                    <UserPage onOpenEvent={openEvent} activeEventId={selectedEventId} />
+                  </RequireAccountAccess>
+                </RouteFrame>
+              }
+            />
+            <Route
               path="/account"
               element={
                 <RouteFrame>
-                  <UserPage onOpenEvent={openEvent} activeEventId={selectedEventId} />
+                  <RequireAccountAccess>
+                    <AccountPage />
+                  </RequireAccountAccess>
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/relief/new"
+              element={
+                <RouteFrame>
+                  <ReliefCreatePage />
+                </RouteFrame>
+              }
+            />
+            <Route
+              path="/relief/:campaignId"
+              element={
+                <RouteFrame>
+                  <ReliefCampaignPage />
                 </RouteFrame>
               }
             />
@@ -102,7 +169,7 @@ function AppLayout() {
               path="/desk"
               element={
                 <RouteFrame>
-                  <Navigate to="/account" replace />
+                  <Navigate to="/for-you" replace />
                 </RouteFrame>
               }
             />
@@ -110,7 +177,7 @@ function AppLayout() {
               path="/user"
               element={
                 <RouteFrame>
-                  <Navigate to="/account" replace />
+                  <Navigate to="/for-you" replace />
                 </RouteFrame>
               }
             />
@@ -125,13 +192,17 @@ function AppLayout() {
           </Routes>
         </AnimatePresence>
       </main>
-      <TickerBar
-        activeSeverities={activeSeverities}
-        onSelectSeverity={toggleSeverity}
-        onClearSeverityFilter={clearSeverityFilter}
-      />
-      <CommandPalette />
-      <EventDetailPanel eventId={selectedEventId} onClose={closeEvent} />
+      {!immersiveRoute && !reliefRoute ? (
+        <>
+          <TickerBar
+            activeSeverities={activeSeverities}
+            onSelectSeverity={toggleSeverity}
+            onClearSeverityFilter={clearSeverityFilter}
+          />
+          <CommandPalette />
+          <EventDetailPanel eventId={selectedEventId} onClose={closeEvent} />
+        </>
+      ) : null}
     </>
   )
 }

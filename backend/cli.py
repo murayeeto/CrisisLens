@@ -114,7 +114,7 @@ def cmd_auth():
     """Check current auth."""
     print("[AUTH] Checking auth...")
     try:
-        resp = requests.get(f"{BASE_URL}/api/auth/me", timeout=10)
+        resp = requests.get(f"{BASE_URL}/api/users/me", timeout=10)
         resp.raise_for_status()
         user = resp.json()
         print("[OK] Authenticated as:\n")
@@ -127,7 +127,7 @@ def cmd_saved():
     """List saved events."""
     print("[SAVED] Listing saved events...")
     try:
-        resp = requests.get(f"{BASE_URL}/api/users/saved-events", timeout=10)
+        resp = requests.get(f"{BASE_URL}/api/users/me/saved-events", timeout=10)
         resp.raise_for_status()
         events = resp.json()
         print(f"[OK] Found {len(events)} saved events\n")
@@ -143,7 +143,7 @@ def cmd_save(event_id):
     """Save an event."""
     print(f"[SAVED] Saving event {event_id}...")
     try:
-        resp = requests.post(f"{BASE_URL}/api/users/saved-events/{event_id}", timeout=10)
+        resp = requests.post(f"{BASE_URL}/api/users/me/saved-events/{event_id}", timeout=10)
         resp.raise_for_status()
         result = resp.json()
         print("[OK] Event saved!\n")

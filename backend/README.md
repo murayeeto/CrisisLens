@@ -24,8 +24,8 @@ cp ../.env.example .env
 3. **Run the server:**
 ```bash
 python main.py
-# or with uvicorn
-uvicorn main:app --reload
+# or with the Flask reloader
+python main.py
 ```
 
 The API will be available at `http://localhost:8000`
@@ -76,7 +76,7 @@ curl http://localhost:8000/api/events/{event_id}
 
 **Check authentication:**
 ```bash
-curl http://localhost:8000/api/auth/me
+curl http://localhost:8000/api/users/me
 ```
 
 **Get saved events:**
@@ -109,7 +109,9 @@ curl -X DELETE http://localhost:8000/api/users/saved-events/{event_id}
 - `POST /api/events/generate?limit=N` - Generate N events from trending news
 
 ### Authentication
-- `GET /api/auth/me` - Get current user (headers: Authorization: Bearer <token>)
+- `GET /api/users/me` - Get current user (headers: Authorization: Bearer <token>)
+- `GET /api/auth/me` - Compatibility alias for current user
+- `PATCH /api/users/me` - Update `displayName`, `preferences`, and `onboardingCompleted`
 
 ### User Data
 - `GET /api/users/saved-events` - Get user's saved events (headers: Authorization)
@@ -120,7 +122,7 @@ curl -X DELETE http://localhost:8000/api/users/saved-events/{event_id}
 
 ```
 backend/
-├── main.py              # FastAPI app entry point
+├── main.py              # Flask app entry point
 ├── config.py            # Configuration and environment variables
 ├── models.py            # Pydantic models
 ├── cli.py               # CLI test script

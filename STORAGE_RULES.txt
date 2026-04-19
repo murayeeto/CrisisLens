@@ -1,0 +1,17 @@
+// Firebase Storage Rules
+// Set these in Firebase Console: Storage > Rules tab
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /campaign-proof/{userId}/{campaignId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

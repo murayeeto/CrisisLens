@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Bookmark, Clock3, MapPin, Share2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { buildReturnPath } from '../../lib/authRouting'
+import { useAuthSession } from '../../providers/AuthSessionProvider'
 import { useEventDetail } from '../../hooks/useEventDetail'
 import { formatCoords, formatTimeAgo, makeFallbackImage } from '../../lib/format'
 import { ErrorState } from '../ui/ErrorState'
@@ -15,6 +17,7 @@ import { ImpactTriad } from './ImpactTriad'
 import { SeverityBadge } from './SeverityBadge'
 import { SourceList } from './SourceList'
 import { WhatToWatch } from './WhatToWatch'
+import { EventReliefFundSection } from '../relief/EventReliefFundSection'
 
 function DetailSkeleton({ onClose }) {
   return (
@@ -44,13 +47,22 @@ export function EventDetailPanel({ eventId, onClose }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { data, loading, error, refetch } = useEventDetail(eventId)
-  const [saved, setSaved] = useState(false)
   const [shareLabel, setShareLabel] = useState('Share')
+  const [savePending, setSavePending] = useState(false)
+  const { isAuthenticated, isEventSaved, saveEvent, unsaveEvent } = useAuthSession()
   const origin = useMemo(() => {
     if (location.pathname === '/trending') return 'TRENDING'
-    if (location.pathname === '/account' || location.pathname === '/desk' || location.pathname === '/user') return 'ACCOUNT'
+    if (
+      location.pathname === '/for-you' ||
+      location.pathname === '/account' ||
+      location.pathname === '/desk' ||
+      location.pathname === '/user'
+    ) {
+      return 'ACCOUNT'
+    }
     return 'GLOBE'
   }, [location.pathname])
+  const saved = useMemo(() => (eventId ? isEventSaved(eventId) : false), [eventId, isEventSaved])
 
   const handleClose = useCallback(() => {
     const search = new URLSearchParams(location.search)
@@ -80,7 +92,6 @@ export function EventDetailPanel({ eventId, onClose }) {
 
   useEffect(() => {
     setShareLabel('Share')
-    setSaved(false)
   }, [eventId])
 
   const shareEvent = async () => {
@@ -122,7 +133,34 @@ export function EventDetailPanel({ eventId, onClose }) {
   }
 
   const detail = data
+  const showingCachedSnapshot = Boolean(detail && error)
   const fallbackImage = detail ? makeFallbackImage(detail.title, detail.severity === 'critical' ? '#EF4444' : '#22D3EE') : ''
+
+  const toggleSave = useCallback(async () => {
+    if (!eventId) return
+
+    if (!isAuthenticated) {
+      navigate('/login', {
+        replace: true,
+        state: { from: buildReturnPath(location, eventId) },
+      })
+      return
+    }
+
+    setSavePending(true)
+
+    try {
+      if (saved) {
+        await unsaveEvent(eventId)
+      } else {
+        await saveEvent(eventId)
+      }
+    } catch (saveError) {
+      console.error('Failed to update saved state:', saveError)
+    } finally {
+      setSavePending(false)
+    }
+  }, [eventId, isAuthenticated, location, navigate, saveEvent, saved, unsaveEvent])
 
   return (
     <AnimatePresence>
@@ -140,9 +178,9 @@ export function EventDetailPanel({ eventId, onClose }) {
             <div className="absolute left-0 top-0 h-full w-px bg-cyan-500/50 shadow-[0_0_18px_rgba(34,211,238,0.35)]" />
 
             <Panel className="thin-scrollbar h-full overflow-hidden rounded-none border-r-0 md:rounded-l-[28px]">
-              {loading ? <DetailSkeleton onClose={handleClose} /> : null}
+              {loading && !detail ? <DetailSkeleton onClose={handleClose} /> : null}
 
-              {!loading && error ? (
+              {!loading && error && !detail ? (
                 <div className="p-5">
                   <ErrorState
                     onRetry={refetch}
@@ -152,7 +190,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                 </div>
               ) : null}
 
-              {!loading && !error && detail ? (
+              {detail ? (
                 <div className="thin-scrollbar h-full overflow-y-auto">
                   <div className="sticky top-0 z-10 border-b border-white/8 bg-[rgba(11,16,32,0.88)] px-5 py-4 backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-4">
@@ -174,6 +212,24 @@ export function EventDetailPanel({ eventId, onClose }) {
                   </div>
 
                   <div className="space-y-6 p-5">
+                    {showingCachedSnapshot ? (
+                      <Panel className="border-amber-500/20 bg-amber-500/[0.06] p-4">
+                        <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-amber-300">
+                          Warn · Cached Snapshot Active
+                        </div>
+                        <p className="mt-2 text-sm text-text-secondary">
+                          Live detail refresh missed this event, so you&apos;re seeing the last cached intelligence snapshot.
+                        </p>
+                        <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-text-dim">
+                          {`signal=cache_fallback endpoint=/api/events/${eventId}`}
+                        </div>
+                        <Button className="mt-4 px-4 py-2 text-[11px]" variant="secondary" onClick={refetch}>
+                          <Clock3 className="h-3.5 w-3.5" />
+                          Retry live detail
+                        </Button>
+                      </Panel>
+                    ) : null}
+
                     <div className="relative overflow-hidden rounded-[24px]">
                       <img
                         src={detail.previewImage || fallbackImage}
@@ -286,10 +342,12 @@ export function EventDetailPanel({ eventId, onClose }) {
                       </div>
                     </section>
 
+                    <EventReliefFundSection event={detail} />
+
                     <div className="flex flex-wrap gap-2 border-t border-white/8 pt-2">
-                      <Button variant="secondary" className="px-4 py-2 text-[11px]" onClick={() => setSaved((current) => !current)}>
+                      <Button variant="secondary" className="px-4 py-2 text-[11px]" onClick={toggleSave} disabled={savePending}>
                         <Bookmark className={`h-3.5 w-3.5 ${saved ? 'fill-cyan-400 text-cyan-400' : ''}`} />
-                        {saved ? 'Saved to account' : 'Save to account'}
+                        {savePending ? 'Updating account' : saved ? 'Saved to account' : 'Save to account'}
                       </Button>
                       <Button variant="secondary" className="px-4 py-2 text-[11px]" onClick={shareEvent}>
                         <Share2 className="h-3.5 w-3.5" />
