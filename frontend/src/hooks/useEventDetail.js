@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { getCached, setCached } from '../lib/cache'
+import { normalizeEvent, normalizeEvents } from '../lib/eventNormalization'
 
 const DETAIL_CACHE_PREFIX = 'event-detail:'
 
@@ -8,30 +9,31 @@ function getCachedEventDetail(id) {
   if (!id) return null
 
   const detail = getCached(`${DETAIL_CACHE_PREFIX}${id}`)
-  if (detail) return detail
+  if (detail) return normalizeEvent(detail)
 
   const cachedEvents = getCached('events')
   if (Array.isArray(cachedEvents)) {
     const match = cachedEvents.find((event) => event?.id === id)
-    if (match) return match
+    if (match) return normalizeEvent(match)
   }
 
   return null
 }
 
 function cacheEventDetail(event) {
-  if (!event?.id) return
+  const normalizedEvent = normalizeEvent(event)
+  if (!normalizedEvent?.id) return
 
-  setCached(`${DETAIL_CACHE_PREFIX}${event.id}`, event)
+  setCached(`${DETAIL_CACHE_PREFIX}${normalizedEvent.id}`, normalizedEvent)
 
   const cachedEvents = getCached('events')
   if (!Array.isArray(cachedEvents)) return
 
-  const nextEvents = cachedEvents.some((item) => item?.id === event.id)
-    ? cachedEvents.map((item) => (item?.id === event.id ? { ...item, ...event } : item))
-    : [event, ...cachedEvents]
+  const nextEvents = cachedEvents.some((item) => item?.id === normalizedEvent.id)
+    ? cachedEvents.map((item) => (item?.id === normalizedEvent.id ? { ...item, ...normalizedEvent } : item))
+    : [normalizedEvent, ...cachedEvents]
 
-  setCached('events', nextEvents)
+  setCached('events', normalizeEvents(nextEvents))
 }
 
 export function useEventDetail(id) {
@@ -52,7 +54,7 @@ export function useEventDetail(id) {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.getEvent(id)
+      const response = normalizeEvent(await api.getEvent(id))
       setData(response)
       cacheEventDetail(response)
     } catch (err) {

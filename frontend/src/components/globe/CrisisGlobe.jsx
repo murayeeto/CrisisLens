@@ -6,6 +6,8 @@ import { formatTimeAgo } from '../../lib/format'
 import { getConnectedEventIds, linkedPairs } from '../../lib/globeConnections'
 import { severityColorRGBA, severityRadius } from '../../lib/severity'
 
+const ANIMATED_RING_LIMIT = 36
+
 const dayNightShader = {
   vertexShader: `
     varying vec3 vWorldNormal;
@@ -131,15 +133,6 @@ export default function CrisisGlobe({
   onViewChange,
 }) {
   const reducedMotion = useReducedMotion()
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('[CrisisGlobe] Received', events.length, 'events')
-    console.log('[CrisisGlobe] Active severities:', activeSeverities)
-    if (events.length > 0) {
-      console.log('[CrisisGlobe] Sample event:', events[0])
-    }
-  }, [events, activeSeverities])
   const containerRef = useRef(null)
   const globeRef = useRef(null)
   const resumeRotateRef = useRef(null)
@@ -173,13 +166,6 @@ export default function CrisisGlobe({
     [activeSeverities, events],
   )
 
-  useEffect(() => {
-    console.log('[CrisisGlobe] Base visible events:', baseVisibleEvents.length, 'from total:', events.length)
-    if (baseVisibleEvents.length < events.length) {
-      console.log('[CrisisGlobe] Filtered by severities:', activeSeverities)
-    }
-  }, [baseVisibleEvents, events, activeSeverities])
-
   const visibleEvents = useMemo(() => {
     if (!focusedEventId) return baseVisibleEvents
 
@@ -187,22 +173,17 @@ export default function CrisisGlobe({
     return baseVisibleEvents.filter((event) => connectedIds.has(event.id))
   }, [baseVisibleEvents, focusedEventId])
 
-  useEffect(() => {
-    console.log('[CrisisGlobe] Visible events after focus filter:', visibleEvents.length)
+  const animatedRingEvents = useMemo(() => {
     if (focusedEventId) {
-      console.log('[CrisisGlobe] Focused on event:', focusedEventId)
+      return visibleEvents.filter((event) => event.id === focusedEventId)
     }
-    
-    // Log all event coordinates to see distribution
-    console.log('[CrisisGlobe] All event locations:')
-    visibleEvents.forEach((event, idx) => {
-      console.log(`  [${idx}] ${event.title.substring(0, 40)}... → lat: ${event.lat}, lng: ${event.lng}, severity: ${event.severity}`)
-    })
-    
-    // Check for coordinate diversity
-    const uniqueCoords = new Set(visibleEvents.map(e => `${e.lat},${e.lng}`))
-    console.log(`[CrisisGlobe] Unique coordinate pairs: ${uniqueCoords.size} out of ${visibleEvents.length}`)
-  }, [visibleEvents, focusedEventId])
+
+    const priorityEvents = visibleEvents.filter(
+      (event) => event.severity === 'critical' || event.severity === 'high',
+    )
+
+    return (priorityEvents.length > 0 ? priorityEvents : visibleEvents).slice(0, ANIMATED_RING_LIMIT)
+  }, [focusedEventId, visibleEvents])
 
   const arcs = useMemo(() => {
     return linkedPairs
@@ -371,11 +352,11 @@ export default function CrisisGlobe({
       controls = globeRef.current?.controls?.()
       if (!controls) return
       controls.autoRotate = !reducedMotion && !dimmed
-      controls.autoRotateSpeed = size.w < 768 ? 0.46 : 0.56
+      controls.autoRotateSpeed = size.w < 768 ? 0.16 : 0.2
       controls.enablePan = false
       controls.enableDamping = true
       controls.dampingFactor = 0.08
-      controls.rotateSpeed = size.w < 768 ? 0.62 : 0.78
+      controls.rotateSpeed = size.w < 768 ? 0.52 : 0.66
       controls.zoomSpeed = 0.8
       controls.minPolarAngle = Math.PI * 0.18
       controls.maxPolarAngle = Math.PI * 0.82
@@ -447,27 +428,18 @@ export default function CrisisGlobe({
         
         // Update pin visibility based on current camera position
         // Query the entire document since pins are rendered inside the Globe canvas container
-        let visibleCount = 0
-        let hiddenCount = 0
-        
         visibleEvents.forEach((event) => {
           const elements = document.querySelectorAll(`[data-event-id="${event.id}"]`)
           elements.forEach((element) => {
             if (isPointVisible(event.lat, event.lng)) {
               element.style.visibility = 'visible'
-              visibleCount++
             } else {
               element.style.visibility = 'hidden'
-              hiddenCount++
             }
           })
         })
-        
-        if (visibleCount + hiddenCount > 0) {
-          console.log(`[CrisisGlobe] Visibility: ${visibleCount} visible, ${hiddenCount} hidden (Total: ${visibleCount + hiddenCount})`)
-        }
       }
-    }, 140)
+    }, 220)
 
     return () => window.clearInterval(interval)
   }, [onViewChange, visibleEvents, isPointVisible])
@@ -572,9 +544,6 @@ export default function CrisisGlobe({
               <div class="crisis-pin__core"></div>
             `
 
-            // Debug: log pin creation
-            console.log(`[CrisisGlobe] Creating pin for "${d.title.substring(0, 30)}..." at (${d.lat}, ${d.lng})`)
-            
             // Click handler with event prevention
             const handleClick = (event) => {
               event.preventDefault()
@@ -608,13 +577,13 @@ export default function CrisisGlobe({
 
             return el
           }}
-          ringsData={visibleEvents}
+          ringsData={animatedRingEvents}
           ringLat={(d) => d.lat}
           ringLng={(d) => d.lng}
           ringColor={(d) => severityColorRGBA(d.severity)}
           ringMaxRadius={(d) => severityRadius(d.severity)}
-          ringPropagationSpeed={1.5}
-          ringRepeatPeriod={1200}
+          ringPropagationSpeed={0.7}
+          ringRepeatPeriod={2600}
           arcsData={arcs}
           arcColor={() => ['rgba(34,211,238,0.15)', 'rgba(34,211,238,0.55)']}
           arcDashLength={0.4}

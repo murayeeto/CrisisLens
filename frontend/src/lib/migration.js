@@ -9,7 +9,7 @@ import { addEventsToFirestore, getEventsFromFirestore } from './firebaseEvents'
 /**
  * Migrate events from API to Firestore
  */
-export async function migrateEventsToFirestore() {
+export async function migrateEventsToFirestore(limit) {
   console.log('[migration] Starting event migration to Firestore...')
   
   try {
@@ -22,7 +22,7 @@ export async function migrateEventsToFirestore() {
 
     // Fetch events from API
     console.log('[migration] Fetching events from API...')
-    const apiEvents = await api.getEvents()
+    const apiEvents = await api.getEvents({ limit })
     
     if (!Array.isArray(apiEvents) || apiEvents.length === 0) {
       console.warn('[migration] No events received from API')
@@ -46,12 +46,12 @@ export async function migrateEventsToFirestore() {
  * Sync events: get from API and update in Firestore
  * Call this periodically to keep events in sync
  */
-export async function syncEventsWithAPI() {
+export async function syncEventsWithAPI(limit) {
   console.log('[migration] Starting event sync with API...')
   
   try {
     // Fetch fresh events from API
-    const apiEvents = await api.getEvents()
+    const apiEvents = await api.getEvents({ limit })
     
     if (!Array.isArray(apiEvents) || apiEvents.length === 0) {
       console.warn('[migration] No events received from API')

@@ -76,7 +76,7 @@ function buildSuggestionReason({
   }
 
   if (learnedCountryStrength && learnedCategoryStrength) {
-    return 'Very close to what you save.'
+    return null
   }
 
   if (learnedCategoryStrength) {
@@ -265,7 +265,9 @@ function FeaturedStoryCard({ event, active, saved, onOpenEvent, onToggleSave }) 
           <h3 className="mt-3 font-display text-[28px] font-semibold tracking-tightish text-white md:text-[34px]">
             {event.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-cyan-100/85">{event.personalizationNote}</p>
+          {event.personalizationNote ? (
+            <p className="mt-3 text-sm leading-6 text-cyan-100/85">{event.personalizationNote}</p>
+          ) : null}
           <p className="mt-4 text-[14px] leading-7 text-text-secondary">{event.previewText}</p>
 
           <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">
@@ -296,19 +298,23 @@ function StorySection({ title, items, onOpenEvent, activeEventId, savedEventIds,
         </span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="thin-scrollbar -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-3">
         {items.map((event) => (
-          <EventCard
+          <div
             key={event.id}
-            event={event}
-            note={event.personalizationNote}
-            highlights={event.matchPills}
-            active={activeEventId === event.id}
-            showBookmark
-            saved={savedEventIds.has(event.id)}
-            onToggleSave={onToggleSave}
-            onClick={() => onOpenEvent(event.id, 'for-you')}
-          />
+            className="w-[86vw] min-w-[280px] max-w-[360px] shrink-0 snap-start sm:w-[340px] xl:w-[360px]"
+          >
+            <EventCard
+              event={event}
+              note={event.personalizationNote}
+              highlights={event.matchPills}
+              active={activeEventId === event.id}
+              showBookmark
+              saved={savedEventIds.has(event.id)}
+              onToggleSave={onToggleSave}
+              onClick={() => onOpenEvent(event.id, 'for-you')}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -505,7 +511,7 @@ export default function UserPage({ onOpenEvent, activeEventId }) {
     const topMatch = filteredSuggestedEvents[0] ?? null
     const usedIds = new Set(topMatch ? [topMatch.id] : [])
 
-    const pick = (predicate, limit = 3) => {
+    const pick = (predicate, limit = Number.POSITIVE_INFINITY) => {
       const items = []
 
       for (const event of filteredSuggestedEvents) {
@@ -513,7 +519,7 @@ export default function UserPage({ onOpenEvent, activeEventId }) {
         items.push(event)
         usedIds.add(event.id)
 
-        if (items.length >= limit) {
+        if (Number.isFinite(limit) && items.length >= limit) {
           break
         }
       }
@@ -603,7 +609,7 @@ export default function UserPage({ onOpenEvent, activeEventId }) {
 
             <div className="relative flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div className="max-w-[620px]">
-                <h2 className="font-display text-[30px] font-semibold tracking-tightish text-white md:text-[36px]">For You</h2>
+                <h2 className="font-display text-[30px] font-semibold tracking-tightish text-white md:text-[36px]">For You Settings</h2>
 
                 <div className="mt-5">
                   <FocusRow label="Following" items={followingItems} emptyLabel="Pick countries or topics" />

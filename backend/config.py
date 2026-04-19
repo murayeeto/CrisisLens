@@ -3,6 +3,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _int_env(name, default):
+    raw_value = os.getenv(name)
+    if raw_value in (None, ""):
+        return default
+
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_env(name, default):
+    raw_value = os.getenv(name)
+    if raw_value in (None, ""):
+        return default
+
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+
 class Config:
     # API Keys
     NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
@@ -30,6 +53,14 @@ class Config:
     # App Settings
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+    EVENT_TARGET_COUNT = _int_env("EVENT_TARGET_COUNT", 200)
+    MAX_EVENT_LIMIT = _int_env("MAX_EVENT_LIMIT", 500)
+    NEWS_RECENT_WINDOW_DAYS = _int_env("NEWS_RECENT_WINDOW_DAYS", 30)
+    NEWS_PRIORITY_WINDOW_DAYS = _int_env("NEWS_PRIORITY_WINDOW_DAYS", 7)
+    NEWS_PAGE_SIZE = _int_env("NEWS_PAGE_SIZE", 100)
+    NEWS_MAX_PAGES_PER_QUERY = _int_env("NEWS_MAX_PAGES_PER_QUERY", 3)
+    NEWS_MAX_RETRIES = _int_env("NEWS_MAX_RETRIES", 3)
+    NEWS_BACKOFF_SECONDS = _float_env("NEWS_BACKOFF_SECONDS", 1.25)
     
     # Feature flags
     USE_MOCK_AUTH = os.getenv("USE_MOCK_AUTH", "false").lower() == "true"

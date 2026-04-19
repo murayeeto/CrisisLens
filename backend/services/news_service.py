@@ -1,9 +1,13 @@
+import hashlib
+import time
 import requests
-from typing import List
+from typing import Dict, List, Optional, Set
+import re
 from config import config
 from models import NewsArticle
 from utils.logger import logger
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from utils.location_parser import clean_location_name, extract_location_from_text
 
 MOCK_ARTICLES = [
     {
@@ -109,6 +113,393 @@ MOCK_ARTICLES = [
 ]
 
 class NewsService:
+    API_URL = "https://newsapi.ai/api/v1/article/getArticles"
+    CRISIS_KEYWORDS = [
+        "earthquake", "flood", "flooding", "wildfire", "hurricane", "typhoon", "tsunami",
+        "landslide", "tornado", "drought", "volcanic", "eruption", "storm", "fire",
+        "evacuation", "explosion", "disaster", "rescue", "outage", "aftershock", "monsoon",
+        "conflict", "attack", "shelling", "airstrike", "strike", "protest", "riot", "unrest",
+        "outbreak", "epidemic", "famine", "displaced", "blackout", "derailment", "collapse",
+    ]
+    FOLLOW_UP_KEYWORDS = [
+        "hearing", "court", "lawsuit", "investigation", "lawmakers", "visit", "recovery",
+        "response", "aid", "rebuild", "inspection", "memorial",
+    ]
+    NON_CRISIS_TOPICS = {
+        "sports": ["golf", "rugby", "premier league", "nba", "mlb", "nfl", "tennis", "soccer"],
+        "entertainment": ["box office", "celebrity", "album", "movie", "tv series", "festival"],
+        "finance": ["earnings", "stock market", "crypto", "nasdaq", "dow jones", "dividend"],
+    }
+    TITLE_DEDUPE_STOPWORDS = {
+        "the", "and", "for", "with", "that", "from", "this", "after", "into", "over", "amid",
+        "breaking", "live", "update", "updates", "reported", "report", "reports", "officials",
+        "emergency", "disaster", "storm", "fire", "crisis", "news", "latest",
+    }
+    KEYWORD_BATCHES = [
+        ["earthquake", "aftershock", "tsunami", "seismic", "volcanic", "eruption"],
+        ["flood", "monsoon", "storm", "hurricane", "typhoon", "cyclone", "wildfire", "drought", "tornado", "landslide"],
+        ["conflict", "attack", "shelling", "airstrike", "war", "military", "riot", "protest", "strike", "unrest"],
+        ["explosion", "derailment", "collapse", "outage", "blackout", "evacuation", "rescue", "accident"],
+        ["outbreak", "epidemic", "famine", "displaced", "humanitarian", "aid", "refugees", "shortage"],
+    ]
+
+    @staticmethod
+    def _tokenize(text: str) -> Set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-zA-Z][a-zA-Z'-]+", (text or "").lower())
+            if len(token) > 2 and token not in {"the", "and", "for", "with", "that", "from", "this", "after", "into", "over"}
+        }
+
+    @staticmethod
+    def _parse_boolish(value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes"}:
+                return True
+            if lowered in {"false", "0", "no"}:
+                return False
+        return None
+
+    @staticmethod
+    def _extract_labels(items) -> List[str]:
+        labels: List[str] = []
+        for item in items or []:
+            if isinstance(item, str):
+                labels.append(item)
+                continue
+
+            if not isinstance(item, dict):
+                continue
+
+            label = item.get("label")
+            if isinstance(label, dict):
+                label = label.get("eng") or next((value for value in label.values() if value), None)
+
+            label = label or item.get("labelEng") or item.get("uri")
+            if label:
+                labels.append(str(label))
+
+        deduped: List[str] = []
+        seen = set()
+        for label in labels:
+            normalized = label.strip()
+            if not normalized:
+                continue
+            lowered = normalized.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            deduped.append(normalized)
+        return deduped[:12]
+
+    @staticmethod
+    def _normalized_title_signature(title: str) -> str:
+        tokens = [
+            token
+            for token in re.findall(r"[a-zA-Z][a-zA-Z'-]+", (title or "").lower())
+            if len(token) > 2 and token not in NewsService.TITLE_DEDUPE_STOPWORDS
+        ]
+        if not tokens:
+            fallback = (title or "untitled").strip().lower()
+            return hashlib.md5(fallback.encode()).hexdigest()
+        return "-".join(sorted(set(tokens))[:12])
+
+    @staticmethod
+    def _location_hint(article: NewsArticle) -> str:
+        raw_location = extract_location_from_text(
+            "\n".join(part for part in [article.title, article.description or "", article.content or ""] if part)
+        )
+        cleaned = clean_location_name(raw_location) if raw_location else ""
+        lowered = cleaned.lower()
+        if lowered in {"", "unknown", "undisclosed location"}:
+            return ""
+        return lowered
+
+    @staticmethod
+    def _build_event_key(article: NewsArticle) -> str:
+        if article.event_uri:
+            return f"event:{article.event_uri}"
+        if article.duplicate_of:
+            return f"duplicate:{article.duplicate_of}"
+
+        location_hint = NewsService._location_hint(article)
+        title_signature = NewsService._normalized_title_signature(article.title)
+        if location_hint:
+            return f"title:{location_hint}|{title_signature}"
+        return f"title:{title_signature}"
+
+    @staticmethod
+    def _parse_article_datetime(value: str) -> Optional[datetime]:
+        if not value:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _coerce_utc_datetime(value: Optional[datetime]) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _article_recency_score(article: NewsArticle, now: Optional[datetime] = None) -> float:
+        published_at = NewsService._parse_article_datetime(article.published_at)
+        if not published_at:
+            return 0
+
+        comparison_now = NewsService._coerce_utc_datetime(now) or datetime.now(timezone.utc)
+        age_hours = max((comparison_now - published_at).total_seconds() / 3600, 0)
+
+        if age_hours <= 24:
+            return 6000
+        if age_hours <= 72:
+            return 4500
+        if age_hours <= config.NEWS_PRIORITY_WINDOW_DAYS * 24:
+            return 3000
+        if age_hours <= 14 * 24:
+            return 1500
+        if age_hours <= config.NEWS_RECENT_WINDOW_DAYS * 24:
+            return 500
+        return 0
+
+    @staticmethod
+    def _article_priority_score(article: NewsArticle, now: Optional[datetime] = None) -> float:
+        content_length = min(len(article.content or ""), 1200)
+        description_length = min(len(article.description or ""), 300)
+        social_score = float(article.social_score or 0)
+        duplicate_penalty = -500 if article.is_duplicate else 0
+        image_bonus = 120 if article.image_url else 0
+        recency_bonus = NewsService._article_recency_score(article, now=now)
+        return content_length + description_length + social_score + image_bonus + duplicate_penalty + recency_bonus
+
+    @staticmethod
+    def _normalize_article(article) -> Optional[NewsArticle]:
+        if not isinstance(article, dict):
+            return None
+
+        title = (article.get("title") or "").strip()
+        url = (article.get("url") or "").strip()
+        if not title or not url:
+            return None
+
+        source = article.get("source") if isinstance(article.get("source"), dict) else {}
+        event_payload = article.get("event") if isinstance(article.get("event"), dict) else {}
+        published_at = article.get("dateTimePub") or article.get("dateTime") or ""
+        body = article.get("body") or ""
+        duplicate_of = (
+            article.get("duplicateArticleUri")
+            or article.get("duplicateUri")
+            or article.get("originalArticleUri")
+            or article.get("originalUri")
+        )
+
+        normalized = NewsArticle(
+            id=article.get("uri") or url,
+            title=title,
+            description=body[:500] if body else (article.get("summary") or article.get("snippet") or ""),
+            image_url=article.get("image", ""),
+            source_name=(source.get("title") or source.get("uri") or "Unknown").strip(),
+            source_uri=source.get("uri"),
+            published_at=published_at,
+            url=url,
+            content=body,
+            language=article.get("lang"),
+            event_uri=article.get("eventUri") or event_payload.get("uri"),
+            duplicate_of=duplicate_of,
+            is_duplicate=NewsService._parse_boolish(article.get("isDuplicate")),
+            social_score=article.get("socialScore"),
+            categories=NewsService._extract_labels(article.get("categories")),
+            concepts=NewsService._extract_labels(article.get("concepts")),
+        )
+        normalized.event_key = NewsService._build_event_key(normalized)
+        return normalized
+
+    @staticmethod
+    def _request_articles_page(session: requests.Session, keyword_batch: List[str], page: int, start_date: str, end_date: str, page_size: int):
+        params = {
+            "apiKey": config.NEWS_API_KEY,
+            "resultType": "articles",
+            "keyword": keyword_batch,
+            "keywordOper": "or",
+            "articlesPage": page,
+            "articlesCount": page_size,
+            "articlesSortBy": "date",
+            "dateStart": start_date,
+            "dateEnd": end_date,
+            "includeArticleConcepts": True,
+            "includeArticleCategories": True,
+            "includeArticleSocialScore": True,
+        }
+
+        for attempt in range(config.NEWS_MAX_RETRIES):
+            try:
+                response = session.get(NewsService.API_URL, params=params, timeout=12)
+                if response.status_code in {429, 500, 502, 503, 504}:
+                    if attempt == config.NEWS_MAX_RETRIES - 1:
+                        response.raise_for_status()
+                    backoff = config.NEWS_BACKOFF_SECONDS * (2 ** attempt)
+                    logger.warning(
+                        f"newsapi.ai returned {response.status_code} for batch {keyword_batch} page {page}; retrying in {backoff:.2f}s"
+                    )
+                    time.sleep(backoff)
+                    continue
+
+                response.raise_for_status()
+                payload = response.json()
+                return payload.get("articles", {}).get("results", [])
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                if attempt == config.NEWS_MAX_RETRIES - 1:
+                    raise
+                backoff = config.NEWS_BACKOFF_SECONDS * (2 ** attempt)
+                logger.warning(
+                    f"Transient fetch error for batch {keyword_batch} page {page}: {exc}. Retrying in {backoff:.2f}s"
+                )
+                time.sleep(backoff)
+
+        return []
+
+    @staticmethod
+    def _group_articles_by_event(articles: List[NewsArticle], now: Optional[datetime] = None) -> List[List[NewsArticle]]:
+        grouped: Dict[str, List[NewsArticle]] = {}
+        for article in articles:
+            event_key = article.event_key or NewsService._build_event_key(article)
+            article.event_key = event_key
+            grouped.setdefault(event_key, []).append(article)
+
+        grouped_articles = []
+        for article_group in grouped.values():
+            ranked_group = sorted(
+                article_group,
+                key=lambda article: (
+                    NewsService._article_priority_score(article, now=now),
+                    article.published_at or "",
+                ),
+                reverse=True,
+            )
+            grouped_articles.append(ranked_group)
+
+        grouped_articles.sort(
+            key=lambda article_group: (
+                NewsService._article_priority_score(article_group[0], now=now),
+                article_group[0].published_at or "",
+            ),
+            reverse=True,
+        )
+        return grouped_articles
+
+    @staticmethod
+    def fetch_trending_news_groups(limit: Optional[int] = None) -> List[List[NewsArticle]]:
+        """
+        Fetch crisis-relevant articles from newsapi.ai in grouped, deduplicated batches.
+        We use the API's 100-item page size, batch keywords to avoid redundant calls,
+        and fetch across the provider's recent-data window to keep major events visible longer.
+        """
+        target_count = max(1, min(limit or config.EVENT_TARGET_COUNT, config.MAX_EVENT_LIMIT))
+        page_size = max(1, min(config.NEWS_PAGE_SIZE, 100))
+        raw_article_target = min(config.MAX_EVENT_LIMIT * 3, max(page_size, target_count * 3))
+
+        now = datetime.now(timezone.utc)
+        priority_window_days = max(1, min(config.NEWS_PRIORITY_WINDOW_DAYS, config.NEWS_RECENT_WINDOW_DAYS))
+        recent_start = now - timedelta(days=priority_window_days)
+        archive_start = now - timedelta(days=config.NEWS_RECENT_WINDOW_DAYS)
+        end_date = now.strftime("%Y-%m-%d")
+
+        query_windows = [
+            (recent_start.strftime("%Y-%m-%d"), end_date, "recent"),
+        ]
+        if config.NEWS_RECENT_WINDOW_DAYS > priority_window_days:
+            archive_end = (recent_start - timedelta(days=1)).strftime("%Y-%m-%d")
+            if archive_end >= archive_start.strftime("%Y-%m-%d"):
+                query_windows.append((archive_start.strftime("%Y-%m-%d"), archive_end, "archive"))
+
+        all_articles: List[NewsArticle] = []
+        seen_exact_keys = set()
+        session = requests.Session()
+
+        try:
+            for start_date, current_end_date, window_name in query_windows:
+                if len(all_articles) >= raw_article_target:
+                    break
+
+                for keyword_batch in NewsService.KEYWORD_BATCHES:
+                    if len(all_articles) >= raw_article_target:
+                        break
+
+                    for page in range(1, max(1, config.NEWS_MAX_PAGES_PER_QUERY) + 1):
+                        logger.info(
+                            f"Fetching newsapi.ai {window_name} batch {keyword_batch} page {page} with page size {page_size}"
+                        )
+                        results = NewsService._request_articles_page(
+                            session,
+                            keyword_batch,
+                            page,
+                            start_date,
+                            current_end_date,
+                            page_size,
+                        )
+                        if not results:
+                            break
+
+                        added_from_page = 0
+                        for article in results:
+                            if len(all_articles) >= raw_article_target:
+                                break
+
+                            normalized = NewsService._normalize_article(article)
+                            if not normalized:
+                                continue
+
+                            exact_key = (normalized.url or normalized.id).strip().lower()
+                            if not exact_key or exact_key in seen_exact_keys:
+                                continue
+
+                            if not NewsService._is_quality_article(normalized):
+                                continue
+
+                            seen_exact_keys.add(exact_key)
+                            all_articles.append(normalized)
+                            added_from_page += 1
+
+                        if len(results) < page_size or added_from_page == 0:
+                            break
+
+            grouped_articles = NewsService._group_articles_by_event(all_articles, now=now)
+            if grouped_articles:
+                logger.info(
+                    f"✓ Successfully fetched {len(all_articles)} raw articles and grouped them into {len(grouped_articles)} events"
+                )
+                return grouped_articles[:target_count]
+
+            raise Exception("No articles found from API")
+        except requests.Timeout:
+            logger.error("newsapi.ai request timed out after retries")
+            raise
+        except requests.ConnectionError as exc:
+            logger.error(f"newsapi.ai connection error: {exc}")
+            raise
+        except Exception as exc:
+            logger.error(f"newsapi.ai error: {exc}", exc_info=True)
+            raise
+        finally:
+            session.close()
+
+    @staticmethod
+    def fetch_trending_news(limit: Optional[int] = None) -> List[NewsArticle]:
+        grouped_articles = NewsService.fetch_trending_news_groups(limit=limit)
+        return [article_group[0] for article_group in grouped_articles if article_group]
+
     @staticmethod
     def _is_quality_article(article: NewsArticle) -> bool:
         """
@@ -117,158 +508,51 @@ class NewsService:
         """
         if not article.title or not article.description:
             return False
-        
+
         title_lower = article.title.lower()
         desc_lower = article.description.lower()
-        
-        # Severe mismatch detection: title mentions one thing, description mentions something completely different
-        # E.g., "Golfer" in title but "Rugby League" in description
+        content_lower = (article.content or "").lower()
+        combined_lower = " ".join(part for part in [title_lower, desc_lower, content_lower] if part)
+
         sports_types = {
-            'golf': ['pga', 'golfer', 'golf tour', 'hole'],
-            'rugby': ['rugby league', 'rugby union', 'dragons', 'flanagan'],
-            'soccer': ['football', 'soccer', 'premier league'],
-            'basketball': ['basketball', 'nba'],
+            "golf": ["pga", "golfer", "golf tour", "hole"],
+            "rugby": ["rugby league", "rugby union", "dragons", "flanagan"],
+            "soccer": ["football", "soccer", "premier league"],
+            "basketball": ["basketball", "nba"],
         }
-        
-        # Check for sport type mismatches
+
         for sport1, keywords1 in sports_types.items():
-            if any(kw in title_lower for kw in keywords1):
-                # Title is about this sport
+            if any(keyword in title_lower for keyword in keywords1):
                 for sport2, keywords2 in sports_types.items():
-                    if sport1 != sport2 and any(kw in desc_lower for kw in keywords2):
-                        # Description is about a different sport - MISMATCH
-                        logger.warning(f"Skipping article: '{sport1}' title but '{sport2}' description")
+                    if sport1 != sport2 and any(keyword in desc_lower for keyword in keywords2):
+                        logger.info(f"Skipping article: '{sport1}' title but '{sport2}' description")
                         return False
-        
-        # Check for Cyrillic-only articles (hard to parse locations)
-        cyrillic_chars = sum(1 for c in desc_lower if ord(c) > 0x0400 and ord(c) <= 0x04FF)
-        if len(desc_lower) > 20 and cyrillic_chars > len(desc_lower) * 0.7:
-            # More than 70% Cyrillic text - likely Russian/Ukrainian with no English locations
-            logger.warning(f"Skipping Cyrillic-heavy article: {article.title[:50]}")
+
+        if not any(keyword in combined_lower for keyword in NewsService.CRISIS_KEYWORDS):
+            logger.info(f"Skipping non-crisis article with weak signal: {article.title[:70]}")
             return False
-        
+
+        title_tokens = NewsService._tokenize(article.title)
+        body_tokens = NewsService._tokenize(f"{article.description} {article.content or ''}")
+        shared_tokens = title_tokens.intersection(body_tokens)
+
+        title_has_follow_up = any(keyword in title_lower for keyword in NewsService.FOLLOW_UP_KEYWORDS)
+        body_has_crisis = any(keyword in f"{desc_lower} {content_lower}" for keyword in NewsService.CRISIS_KEYWORDS)
+
+        if len(title_tokens) >= 4 and len(body_tokens) >= 8 and len(shared_tokens) == 0 and not (title_has_follow_up and body_has_crisis):
+            logger.info(f"Skipping topic-mismatch article: {article.title[:70]}")
+            return False
+
+        for topic, keywords in NewsService.NON_CRISIS_TOPICS.items():
+            if any(keyword in title_lower for keyword in keywords) and not body_has_crisis:
+                logger.info(f"Skipping likely {topic} article: {article.title[:70]}")
+                return False
+
+        cyrillic_chars = sum(1 for char in desc_lower if ord(char) > 0x0400 and ord(char) <= 0x04FF)
+        if len(desc_lower) > 20 and cyrillic_chars > len(desc_lower) * 0.7:
+            logger.info(f"Skipping Cyrillic-heavy article: {article.title[:50]}")
+            return False
+
         return True
-    
-    @staticmethod
-    def fetch_trending_news() -> List[NewsArticle]:
-        """Fetch trending news from newsapi.ai - ALWAYS use real API data, never mock."""
-        
-        # Always try real API - don't use mock data
-        try:
-            # Calculate date range for last 3 days
-            now = datetime.now()
-            three_days_ago = now - timedelta(days=3)
-            start_date = three_days_ago.strftime("%Y-%m-%d")
-            end_date = now.strftime("%Y-%m-%d")
-            
-            # Using newsapi.ai endpoint for any news articles (regardless of crisis)
-            # We'll extract real location from any article
-            url = "https://newsapi.ai/api/v1/article/getArticles"
-            
-            # Broad search terms to get diverse articles with real locations
-            keywords = [
-                "earthquake",
-                "flood", 
-                "wildfire",
-                "hurricane",
-                "tsunami",
-                "landslide",
-                "tornado",
-                "drought",
-                "volcanic",
-                "accident",
-                "disaster",
-                "storm",
-                "weather",
-                "earthquake",
-                "fire",
-                "emergency",
-                "alert",
-                "warning",
-                "crisis",
-                "incident"
-            ]
-            
-            all_articles = []
-            
-            # Fetch articles for each keyword
-            for keyword in keywords:
-                if len(all_articles) >= 20:
-                    break  # Stop once we have 20
-                
-                try:
-                    params = {
-                        "apiKey": config.NEWS_API_KEY,
-                        "keyword": keyword,
-                        "articlesPage": 1,
-                        "articlesCount": 10,  # Fetch 10 per keyword
-                        "dateStart": start_date,
-                        "dateEnd": end_date
-                    }
-                    
-                    logger.info(f"Fetching articles from newsapi.ai for keyword: {keyword}")
-                    response = requests.get(url, params=params, timeout=8)
-                    response.raise_for_status()
-                    data = response.json()
-                    
-                    # newsapi.ai returns articles in articles.results structure
-                    results = data.get("articles", {}).get("results", [])
-                    logger.info(f"API returned {len(results)} results for '{keyword}'")
-                    
-                    for article in results:
-                        if len(all_articles) >= 20:
-                            break
-                            
-                        try:
-                            normalized = NewsArticle(
-                                id=article.get("uri", ""),
-                                title=article.get("title", ""),
-                                description=article.get("body", "")[:500] if article.get("body") else "",
-                                image_url=article.get("image", ""),
-                                source_name=article.get("source", {}).get("title", "Unknown") if isinstance(article.get("source"), dict) else "Unknown",
-                                published_at=article.get("dateTimePub", article.get("dateTime", "")),
-                                url=article.get("url", ""),
-                                content=article.get("body", "")
-                            )
-                            
-                            # Check if article already exists (by URL or title) to avoid duplicates
-                            is_duplicate = any(
-                                a.url == normalized.url or 
-                                (a.title.lower() == normalized.title.lower() and a.title)  # Check title if both exist
-                                for a in all_articles
-                            )
-                            
-                            # Check for content quality - skip articles with severe mismatches
-                            # (e.g., golf title with rugby description)
-                            if not is_duplicate and NewsService._is_quality_article(normalized):
-                                all_articles.append(normalized)
-                                logger.info(f"✓ Added article: {normalized.title[:60]}")
-                            else:
-                                if is_duplicate:
-                                    logger.info(f"⊘ Skipped duplicate: {normalized.title[:60]}")
-                                else:
-                                    logger.info(f"⊘ Skipped low-quality: {normalized.title[:60]} (mismatched content)")
-                        except Exception as e:
-                            logger.warning(f"Error parsing article: {e}")
-                            continue
-                except Exception as e:
-                    logger.warning(f"Error fetching articles for keyword '{keyword}': {e}")
-                    continue
-            
-            if all_articles:
-                logger.info(f"✓ Successfully fetched {len(all_articles)} real articles from newsapi.ai")
-                return all_articles
-            else:
-                raise Exception("No articles found from API")
-            
-        except requests.Timeout:
-            logger.error(f"newsapi.ai request timed out. Retrying...")
-            raise
-        except requests.ConnectionError as e:
-            logger.error(f"newsapi.ai connection error: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"newsapi.ai error: {e}", exc_info=True)
-            raise
 
 news_service = NewsService()

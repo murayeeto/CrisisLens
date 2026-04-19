@@ -34,6 +34,8 @@ MOCK_LOCATIONS = {
     "jakarta": Location(name="Jakarta, Indonesia", latitude=-6.2088, longitude=106.8456, country="Indonesia", region="Java"),
     
     # USA locations
+    "texas": Location(name="Texas, United States", latitude=31.0, longitude=-99.0, country="United States", region="Texas"),
+    "camp mystic": Location(name="Hunt, Texas, United States", latitude=30.0741, longitude=-99.3342, country="United States", region="Texas"),
     "oklahoma": Location(name="Oklahoma, USA", latitude=35.5653, longitude=-97.5289, country="USA", region="Oklahoma"),
     "norman": Location(name="Norman, Oklahoma", latitude=35.3395, longitude=-97.4867, country="USA", region="Oklahoma"),
     

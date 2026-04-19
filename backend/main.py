@@ -8,6 +8,7 @@ from services.news_service import news_service
 from services.event_service import event_service
 from services.relief_fund_service import relief_fund_service, ReliefFundError
 from services.stripe_service import stripe_service
+from services.openai_service import generate_mock_analysis_from_text, analysis_needs_refresh
 from services.translation_service import TranslationService
 
 app = Flask(
@@ -62,6 +63,12 @@ def _serialize_datetime(value):
 
     return value
 
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 def _normalize_severity(value):
     if value == "moderate":
         return "medium"
@@ -95,23 +102,67 @@ def _derive_event_category(event):
 
     return "other"
 
+def _serialize_source_article(article):
+    if not article:
+        return None
+
+    return {
+        "id": article.id,
+        "title": article.title,
+        "description": article.description or "",
+        "imageUrl": article.image_url or "",
+        "sourceName": article.source_name,
+        "sourceUri": getattr(article, "source_uri", None),
+        "publishedAt": _serialize_datetime(article.published_at),
+        "url": article.url,
+        "content": article.content or "",
+        "language": getattr(article, "language", None),
+        "eventUri": getattr(article, "event_uri", None),
+        "eventKey": getattr(article, "event_key", None),
+        "duplicateOf": getattr(article, "duplicate_of", None),
+        "isDuplicate": getattr(article, "is_duplicate", None),
+        "socialScore": getattr(article, "social_score", None),
+        "categories": list(getattr(article, "categories", []) or []),
+        "concepts": list(getattr(article, "concepts", []) or []),
+    }
+
+def _severity_priority(value):
+    return {
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1,
+        "info": 0,
+    }.get((value or "info").lower(), 0)
+
 def _serialize_event(event):
     if not event:
         return None
 
     severity = _normalize_severity(event.ai_analysis.severity if event.ai_analysis else "info")
     category = _derive_event_category(event)
+    source_articles = [
+        serialized_article
+        for serialized_article in (_serialize_source_article(article) for article in (event.source_articles or []))
+        if serialized_article
+    ]
     sources = [
         {
-            "name": article.source_name,
-            "url": article.url,
-            "publishedAt": article.published_at,
+            "id": article.get("id"),
+            "name": article.get("sourceName"),
+            "url": article.get("url"),
+            "publishedAt": article.get("publishedAt"),
+            "sourceUri": article.get("sourceUri"),
+            "isDuplicate": article.get("isDuplicate"),
         }
-        for article in (event.source_articles or [])
+        for article in source_articles
     ]
+    primary_source = source_articles[0] if source_articles else {}
+    event_key = primary_source.get("eventUri") or primary_source.get("eventKey") or event.id
 
     return {
         "id": event.id,
+        "eventKey": event_key,
         "title": event.title,
         "description": event.description,
         "severity": severity,
@@ -130,8 +181,12 @@ def _serialize_event(event):
         "impactAnalysis": event.ai_analysis.impact_analysis if event.ai_analysis else "",
         "howToHelp": event.ai_analysis.how_to_help if event.ai_analysis else "",
         "watchGuidance": event.ai_analysis.watch_guidance if event.ai_analysis else "",
+        "sourceArticles": source_articles,
         "sources": sources,
         "sourcesCount": len(sources),
+        "articleCount": len(source_articles),
+        "primarySourceName": primary_source.get("sourceName"),
+        "primarySourceUrl": primary_source.get("url"),
         "tags": [category.replace('-', ' '), severity],
     }
 
@@ -143,15 +198,71 @@ def _normalize_event_snapshot(payload):
         return None
 
     snapshot = dict(payload)
-    snapshot["startedAt"] = _serialize_datetime(snapshot.get("startedAt"))
+    snapshot["startedAt"] = _serialize_datetime(snapshot.get("startedAt") or snapshot.get("createdAt"))
     snapshot["updatedAt"] = _serialize_datetime(snapshot.get("updatedAt"))
+    snapshot["country"] = snapshot.get("country", "") or ""
+    snapshot["previewImage"] = snapshot.get("previewImage", "") or ""
+    snapshot["previewText"] = snapshot.get("previewText") or snapshot.get("description", "")
 
     if "lat" in snapshot and snapshot.get("lat") is not None:
         snapshot["lat"] = float(snapshot["lat"])
     if "lng" in snapshot and snapshot.get("lng") is not None:
         snapshot["lng"] = float(snapshot["lng"])
 
-    return snapshot
+    source_articles = snapshot.get("sourceArticles")
+    if not isinstance(source_articles, list):
+        source_articles = []
+    snapshot["sourceArticles"] = source_articles
+
+    sources = snapshot.get("sources")
+    if not isinstance(sources, list) or not sources:
+        sources = [
+            {
+                "id": article.get("id"),
+                "name": article.get("sourceName"),
+                "url": article.get("url"),
+                "publishedAt": article.get("publishedAt"),
+                "sourceUri": article.get("sourceUri"),
+                "isDuplicate": article.get("isDuplicate"),
+            }
+            for article in source_articles
+            if isinstance(article, dict)
+        ]
+    snapshot["sources"] = sources
+    snapshot["sourcesCount"] = max(_safe_int(snapshot.get("sourcesCount")), len(sources), len(source_articles))
+    snapshot["articleCount"] = max(_safe_int(snapshot.get("articleCount")), len(source_articles), snapshot["sourcesCount"])
+    snapshot["eventKey"] = snapshot.get("eventKey") or snapshot.get("id")
+    snapshot["primarySourceName"] = snapshot.get("primarySourceName") or (sources[0].get("name") if sources else None)
+    snapshot["primarySourceUrl"] = snapshot.get("primarySourceUrl") or (sources[0].get("url") if sources else None)
+    snapshot["tags"] = snapshot.get("tags") or [snapshot.get("category", "other"), snapshot.get("severity", "info")]
+
+    return _repair_event_snapshot_analysis(snapshot)
+
+def _repair_event_snapshot_analysis(snapshot):
+    if not snapshot:
+        return snapshot
+
+    current_summary = snapshot.get("aiSummary", "")
+    title = snapshot.get("title", "")
+    description = snapshot.get("description", "")
+
+    if not analysis_needs_refresh(title, description, current_summary):
+        return snapshot
+
+    location = snapshot.get("location", "Unknown")
+    grounded_analysis = generate_mock_analysis_from_text(
+        f"Title: {title}\nDescription: {description}\n",
+        location,
+    )
+
+    repaired = dict(snapshot)
+    repaired["aiSummary"] = grounded_analysis.summary
+    repaired["affectedGroups"] = grounded_analysis.affected_groups
+    repaired["impactAnalysis"] = grounded_analysis.impact_analysis
+    repaired["howToHelp"] = grounded_analysis.how_to_help
+    repaired["watchGuidance"] = grounded_analysis.watch_guidance
+    repaired["severity"] = _normalize_severity(grounded_analysis.severity)
+    return repaired
 
 def _persist_event_snapshot(payload):
     snapshot = _normalize_event_snapshot(payload)
@@ -201,6 +312,29 @@ def _resolve_event(event_id):
             logger.warning(f"Could not create event while resolving {event_id}: {exc}")
 
     return None
+
+def _coerce_event_limit(raw_value):
+    if raw_value in (None, ""):
+        return None
+
+    try:
+        parsed_limit = int(raw_value)
+    except (TypeError, ValueError):
+        return config.EVENT_TARGET_COUNT
+
+    return max(1, min(parsed_limit, config.MAX_EVENT_LIMIT))
+
+def _event_sort_key(event):
+    return (
+        _severity_priority(event.get("severity")),
+        _serialize_datetime(
+            event.get("updatedAt")
+            or event.get("startedAt")
+            or event.get("timestamp")
+            or ""
+        ) or "",
+        event.get("articleCount") or event.get("sourcesCount") or 0,
+    )
 
 def _verify_request_user():
     auth_header = request.headers.get('Authorization', '')
@@ -276,16 +410,18 @@ def get_events():
         language = request.args.get('language', 'en').lower()
         if language not in TranslationService.LANGUAGE_CODES:
             language = 'en'
+        requested_limit = _coerce_event_limit(request.args.get('limit'))
+        target_event_count = requested_limit or config.EVENT_TARGET_COUNT
         
         # STRATEGY 1: Try to load events from Firestore (persistent storage)
         logger.info("Attempting to load events from Firestore...")
+        firestore_events = []
+        existing_ids = set()
         try:
             db = firebase_service._db
             if not db:
                 logger.warning("Firebase not initialized, skipping Firestore load")
                 raise Exception("Firebase not available")
-            firestore_events = []
-            seen_ids = set()
             
             # Query all events from Firestore
             docs = db.collection('events').stream()
@@ -294,75 +430,80 @@ def get_events():
                 event_id = event_data.get('id')
                 
                 # Skip duplicates
-                if event_id in seen_ids:
+                if not event_id:
+                    logger.warning(f"Skipping event document without id: {doc.id}")
+                    continue
+                if event_id in existing_ids:
                     logger.warning(f"Skipping duplicate event: {event_id}")
                     continue
-                seen_ids.add(event_id)
+                existing_ids.add(event_id)
                 
-                event = {
-                    "id": event_id,
-                    "title": event_data.get('title'),
-                    "description": event_data.get('description'),
-                    "severity": event_data.get('severity', 'info'),
-                    "category": event_data.get('category', 'other'),
-                    "region": event_data.get('region', 'Unknown'),
-                    "location": event_data.get('location', 'Unknown'),
-                    "lat": float(event_data.get('lat', 0)),
-                    "lng": float(event_data.get('lng', 0)),
-                    "timestamp": event_data.get('createdAt', ''),
-                    "startedAt": event_data.get('createdAt', ''),
-                    "updatedAt": event_data.get('updatedAt', ''),
-                    "previewImage": event_data.get('previewImage', ''),
-                    "aiSummary": event_data.get('aiSummary', event_data.get('description', '')),
-                    "affectedGroups": event_data.get('affectedGroups', []),
-                    "impactAnalysis": event_data.get('impactAnalysis', ''),
-                    "howToHelp": event_data.get('howToHelp', ''),
-                    "watchGuidance": event_data.get('watchGuidance', ''),
-                    "sources": event_data.get('sources', []),
-                    "sourcesCount": len(event_data.get('sources', [])),
-                }
+                needs_analysis_refresh = analysis_needs_refresh(
+                    event_data.get("title", ""),
+                    event_data.get("description", ""),
+                    event_data.get("aiSummary", ""),
+                )
+                event = _normalize_event_snapshot(event_data)
+                if not event:
+                    logger.warning(f"Skipping invalid event snapshot: {event_id}")
+                    continue
                 
                 # Translate summaries if needed and enabled
                 if language != 'en' and config.ENABLE_TRANSLATIONS:
-                    event = TranslationService.translate_event_summaries(event, language)
+                    event = TranslationService.translate_event_summaries(dict(event), language)
                 
                 firestore_events.append(event)
+                if needs_analysis_refresh:
+                    _persist_event_snapshot(event_data)
             
             if firestore_events:
                 logger.info(f"✓ Loaded {len(firestore_events)} unique events from Firestore")
-                return jsonify(firestore_events), 200
+                firestore_events.sort(key=_event_sort_key, reverse=True)
+                if len(firestore_events) >= target_event_count:
+                    response_events = firestore_events[:requested_limit] if requested_limit else firestore_events
+                    logger.info(f"Returning {len(response_events)} events from Firestore cache")
+                    return jsonify(response_events), 200
+                logger.info(
+                    f"Firestore has {len(firestore_events)} events, topping up to target of {target_event_count}"
+                )
             else:
                 logger.info("No events found in Firestore, will generate new ones")
         except Exception as e:
             logger.warning(f"Could not load from Firestore: {e}, generating new events...")
         
-        # STRATEGY 2: If Firestore empty, fetch trending news articles and create events
-        logger.info("Fetching trending news articles...")
-        articles = news_service.fetch_trending_news()
-        
-        if not articles:
-            logger.warning("No articles available from news service")
-            return jsonify([]), 200
-        
-        # Get existing event IDs from Firestore to avoid duplicates
-        existing_ids = set()
+        # STRATEGY 2: If Firestore is empty or below target, fetch grouped article coverage and create missing events
+        missing_event_count = max(target_event_count - len(firestore_events), 0)
+        fetch_target_count = min(config.MAX_EVENT_LIMIT, target_event_count)
+        logger.info(
+            f"Fetching grouped news coverage to fill {missing_event_count} missing events (fetch target {fetch_target_count})..."
+        )
         try:
-            db = firebase_service._db
-            if db:
-                docs = db.collection('events').stream()
-                for doc in docs:
-                    event_data = doc.to_dict()
-                    existing_ids.add(event_data.get('id'))
-                logger.info(f"Found {len(existing_ids)} existing events in Firestore")
-        except Exception as e:
-            logger.warning(f"Could not fetch existing IDs: {e}")
+            article_groups = news_service.fetch_trending_news_groups(limit=fetch_target_count)
+        except Exception as exc:
+            if firestore_events:
+                logger.warning(f"Could not top up cached events: {exc}. Returning cached results instead.")
+                response_events = firestore_events[:requested_limit] if requested_limit else firestore_events
+                return jsonify(response_events), 200
+            raise
+        
+        if not article_groups:
+            logger.warning("No grouped articles available from news service")
+            response_events = firestore_events[:requested_limit] if requested_limit else firestore_events
+            return jsonify(response_events), 200
+        
+        if existing_ids:
+            logger.info(f"Found {len(existing_ids)} existing events in Firestore before top-up")
         
         # Convert articles to events and store in Firestore
-        events = []
-        for article in articles[:20]:  # Limit to 20 events
+        generated_events = []
+        for article_group in article_groups:
+            if len(firestore_events) + len(generated_events) >= target_event_count:
+                break
             try:
-                logger.info(f"Converting article '{article.title}' to event...")
-                event = event_service.create_event_from_articles([article])
+                if not article_group:
+                    continue
+                logger.info(f"Converting grouped story '{article_group[0].title}' with {len(article_group)} sources into event...")
+                event = event_service.create_event_from_articles(article_group)
                 
                 # Skip if event already exists
                 if event.id in existing_ids:
@@ -383,15 +524,17 @@ def get_events():
                 if language != 'en' and config.ENABLE_TRANSLATIONS:
                     serialized_event = TranslationService.translate_event_summaries(serialized_event, language)
                 
-                events.append(serialized_event)
+                generated_events.append(serialized_event)
                 existing_ids.add(event.id)  # Track new event to avoid duplicates in this batch
                 logger.info(f"Event converted successfully")
             except Exception as e:
                 logger.error(f"Error converting article to event: {e}", exc_info=True)
                 continue
         
-        logger.info(f"Returning {len(events)} new events")
-        return jsonify(events), 200
+        combined_events = sorted(firestore_events + generated_events, key=_event_sort_key, reverse=True)
+        response_events = combined_events[:requested_limit] if requested_limit else combined_events
+        logger.info(f"Returning {len(response_events)} events after cache top-up")
+        return jsonify(response_events), 200
     
     except Exception as e:
         logger.error(f"Error fetching events: {e}")

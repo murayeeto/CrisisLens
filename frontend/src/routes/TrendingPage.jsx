@@ -7,8 +7,13 @@ import { useAuthSession } from '../providers/AuthSessionProvider'
 import { EventCard } from '../components/event/EventCard'
 import { Panel } from '../components/ui/Panel'
 import { Skeleton } from '../components/ui/Skeleton'
+import { normalizeSeverity, severityOrder } from '../lib/severity'
 
 const filters = ['All', 'Wildfires', 'Storms', 'Markets', 'Transit', 'Protests', 'Other']
+const severityPriority = severityOrder.reduce((accumulator, severity, index) => {
+  accumulator[severity] = index
+  return accumulator
+}, {})
 
 const matchesFilter = (event, filter) => {
   if (filter === 'All') return true
@@ -67,8 +72,10 @@ export default function TrendingPage({ onOpenEvent, activeEventId }) {
       })
       .sort((a, b) => {
         if (sortMode === 'Severity') {
-          const order = { critical: 0, high: 1, moderate: 2, low: 3, info: 4 }
-          return order[a.severity] - order[b.severity]
+          return (
+            (severityPriority[normalizeSeverity(a.severity)] ?? severityOrder.length) -
+            (severityPriority[normalizeSeverity(b.severity)] ?? severityOrder.length)
+          )
         }
         return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
       })

@@ -3,23 +3,32 @@ import { useMemo } from 'react'
 import { useEvents } from '../../hooks/useEvents'
 import { getSeverityConfig, severityColor } from '../../lib/severity'
 
+const TICKER_ITEM_LIMIT = 60
+const TICKER_BASE_DURATION_SECONDS = 80
+const TICKER_SECONDS_PER_ITEM = 2
+
 export function TickerBar({ activeSeverities = [], onSelectSeverity, onClearSeverityFilter }) {
   const { data: events } = useEvents()
 
-  const tickerItems = useMemo(() => {
+  const { tickerItems, tickerDuration } = useMemo(() => {
     const resolved =
       activeSeverities.length > 0
         ? events.filter((event) => activeSeverities.includes(event.severity))
         : events
 
-    const items = resolved.map((event) => ({
+    const items = resolved.slice(0, TICKER_ITEM_LIMIT).map((event) => ({
       id: event.id,
       label: `${event.location.split(',')[0]} — ${event.category.replace('-', ' ')}`,
       severityLabel: getSeverityConfig(event.severity).label,
       severity: event.severity,
     }))
 
-    return [...items, ...items]
+    const durationSeconds = Math.max(TICKER_BASE_DURATION_SECONDS, items.length * TICKER_SECONDS_PER_ITEM)
+
+    return {
+      tickerItems: [...items, ...items],
+      tickerDuration: `${durationSeconds}s`,
+    }
   }, [activeSeverities, events])
 
   const filterSummary = useMemo(() => {
@@ -43,7 +52,10 @@ export function TickerBar({ activeSeverities = [], onSelectSeverity, onClearSeve
         </div>
       ) : null}
       <div className="overflow-hidden">
-        <div className="ticker-track flex min-w-max items-center gap-8 px-6 py-2">
+        <div
+          className="ticker-track flex min-w-max items-center gap-8 px-6 py-2"
+          style={{ '--ticker-duration': tickerDuration }}
+        >
           {tickerItems.map((item, index) => (
             <div key={`${item.id}-${index}`} className="flex items-center gap-2 whitespace-nowrap">
               <button
