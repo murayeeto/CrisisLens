@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bookmark, Clock3, MapPin, Share2, X } from 'lucide-react'
+import { Bookmark, Clock3, Languages, MapPin, Share2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { buildReturnPath } from '../../lib/authRouting'
+import { api } from '../../lib/api'
 import { useAuthSession } from '../../providers/AuthSessionProvider'
 import { useEventDetail } from '../../hooks/useEventDetail'
 import { formatCoords, formatTimeAgo, makeFallbackImage } from '../../lib/format'
@@ -49,7 +50,10 @@ export function EventDetailPanel({ eventId, onClose }) {
   const { data, loading, error, refetch } = useEventDetail(eventId)
   const [shareLabel, setShareLabel] = useState('Share')
   const [savePending, setSavePending] = useState(false)
+  const [translationPending, setTranslationPending] = useState(false)
+  const [translatedSummaries, setTranslatedSummaries] = useState(null)
   const { isAuthenticated, isEventSaved, saveEvent, unsaveEvent } = useAuthSession()
+  const { profile } = useAuthSession()
   const origin = useMemo(() => {
     if (location.pathname === '/trending') return 'TRENDING'
     if (
@@ -92,6 +96,7 @@ export function EventDetailPanel({ eventId, onClose }) {
 
   useEffect(() => {
     setShareLabel('Share')
+    setTranslatedSummaries(null)
   }, [eventId])
 
   const shareEvent = async () => {
@@ -162,6 +167,27 @@ export function EventDetailPanel({ eventId, onClose }) {
     }
   }, [eventId, isAuthenticated, location, navigate, saveEvent, saved, unsaveEvent])
 
+  const handleTranslate = useCallback(async () => {
+    if (!eventId || !profile?.language || profile.language === 'en') return
+    
+    setTranslationPending(true)
+    try {
+      const translated = await api.translateEvent(eventId, profile.language)
+      
+      setTranslatedSummaries({
+        title: translated.title,
+        aiSummary: translated.aiSummary,
+        impactAnalysis: translated.impactAnalysis,
+        watchGuidance: translated.watchGuidance,
+        howToHelp: translated.howToHelp,
+      })
+    } catch (error) {
+      console.error('[EventDetailPanel] Translation error:', error)
+    } finally {
+      setTranslationPending(false)
+    }
+  }, [eventId, profile?.language])
+
   return (
     <AnimatePresence>
       {eventId ? (
@@ -195,7 +221,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                   <div className="sticky top-0 z-10 border-b border-white/8 bg-[rgba(11,16,32,0.88)] px-5 py-4 backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0 font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
-                        {origin} › EVENT › {detail.title}
+                        {origin} › EVENT › {translatedSummaries?.title || detail.title}
                       </div>
                       <div className="flex items-center gap-2">
                         <Kbd>Esc</Kbd>
@@ -253,7 +279,7 @@ export function EventDetailPanel({ eventId, onClose }) {
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
                         ◦ {(detail.category || 'intel').toUpperCase()} · {(detail.region || 'unknown').toUpperCase()}
                       </div>
-                      <h2 className="mt-3 font-display text-[28px] font-semibold tracking-tightish text-white">{detail.title}</h2>
+                      <h2 className="mt-3 font-display text-[28px] font-semibold tracking-tightish text-white">{translatedSummaries?.title || detail.title}</h2>
                       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-text-secondary">
                         <span className="inline-flex items-center gap-2 font-mono uppercase tracking-[0.12em]">
                           <MapPin className="h-3.5 w-3.5 text-cyan-400" />
@@ -271,8 +297,8 @@ export function EventDetailPanel({ eventId, onClose }) {
                         ◦ AI Intelligence Summary
                       </div>
                       <div className="mt-4">
-                        {detail.aiSummary ? (
-                          <Typewriter text={detail.aiSummary} speed={18} />
+                        {detail.aiSummary || translatedSummaries?.aiSummary ? (
+                          <Typewriter text={translatedSummaries?.aiSummary || detail.aiSummary} speed={18} />
                         ) : (
                           <p className="text-[13px] leading-6 text-text-secondary">{detail.description || 'Analysis pending...'}</p>
                         )}
@@ -307,17 +333,17 @@ export function EventDetailPanel({ eventId, onClose }) {
                         ◦ What to Watch Next
                       </div>
                       <div className="mt-4">
-                        <WhatToWatch items={detail.watchGuidance ? [detail.watchGuidance] : []} />
+                        <WhatToWatch items={translatedSummaries?.watchGuidance || detail.watchGuidance ? [translatedSummaries?.watchGuidance || detail.watchGuidance] : []} />
                       </div>
                     </section>
 
-                    {detail.impactAnalysis && (
+                    {(translatedSummaries?.impactAnalysis || detail.impactAnalysis) && (
                       <section>
                         <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
                           ◦ Impact Analysis
                         </div>
                         <div className="mt-4">
-                          <p className="text-[13px] leading-6 text-text-secondary">{detail.impactAnalysis}</p>
+                          <p className="text-[13px] leading-6 text-text-secondary">{translatedSummaries?.impactAnalysis || detail.impactAnalysis}</p>
                         </div>
                       </section>
                     )}
@@ -334,8 +360,8 @@ export function EventDetailPanel({ eventId, onClose }) {
                     <section>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ How to Help</div>
                       <div className="mt-4">
-                        {detail.howToHelp ? (
-                          <p className="text-[13px] leading-6 text-text-secondary">{detail.howToHelp}</p>
+                        {translatedSummaries?.howToHelp || detail.howToHelp ? (
+                          <p className="text-[13px] leading-6 text-text-secondary">{translatedSummaries?.howToHelp || detail.howToHelp}</p>
                         ) : (
                           <p className="text-[13px] leading-6 text-text-secondary/50 italic">No assistance guidance available</p>
                         )}
@@ -353,6 +379,17 @@ export function EventDetailPanel({ eventId, onClose }) {
                         <Share2 className="h-3.5 w-3.5" />
                         {shareLabel}
                       </Button>
+                      {profile?.language && profile.language !== 'en' && (
+                        <Button 
+                          variant="secondary" 
+                          className="px-4 py-2 text-[11px]" 
+                          onClick={handleTranslate}
+                          disabled={translationPending}
+                        >
+                          <Languages className="h-3.5 w-3.5" />
+                          {translationPending ? 'Translating...' : 'Translate'}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         className="px-4 py-2 text-[11px]"

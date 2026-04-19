@@ -8,6 +8,7 @@ from services.news_service import news_service
 from services.event_service import event_service
 from services.relief_fund_service import relief_fund_service, ReliefFundError
 from services.stripe_service import stripe_service
+from services.translation_service import TranslationService
 
 app = Flask(
     __name__,
@@ -250,6 +251,7 @@ def _build_user_payload(decoded_token):
             "countries": preferences.get("countries", []),
             "categories": preferences.get("categories", []),
         },
+        "language": user_data.get("language", "en"),
         "onboardingCompleted": bool(user_data.get("onboardingCompleted", False)),
     }
 
@@ -270,6 +272,11 @@ def get_events():
     """Fetch events from Firestore first, then generate new ones if needed."""
     logger.info("Get events endpoint called")
     try:
+        # Get language preference from query params
+        language = request.args.get('language', 'en').lower()
+        if language not in TranslationService.LANGUAGE_CODES:
+            language = 'en'
+        
         # STRATEGY 1: Try to load events from Firestore (persistent storage)
         logger.info("Attempting to load events from Firestore...")
         try:
@@ -292,7 +299,7 @@ def get_events():
                     continue
                 seen_ids.add(event_id)
                 
-                firestore_events.append({
+                event = {
                     "id": event_id,
                     "title": event_data.get('title'),
                     "description": event_data.get('description'),
@@ -313,7 +320,13 @@ def get_events():
                     "watchGuidance": event_data.get('watchGuidance', ''),
                     "sources": event_data.get('sources', []),
                     "sourcesCount": len(event_data.get('sources', [])),
-                })
+                }
+                
+                # Translate summaries if needed and enabled
+                if language != 'en' and config.ENABLE_TRANSLATIONS:
+                    event = TranslationService.translate_event_summaries(event, language)
+                
+                firestore_events.append(event)
             
             if firestore_events:
                 logger.info(f"✓ Loaded {len(firestore_events)} unique events from Firestore")
@@ -365,6 +378,11 @@ def get_events():
                 
                 serialized_event = _serialize_event(event)
                 _persist_event_snapshot(serialized_event)
+                
+                # Translate summaries if needed and enabled
+                if language != 'en' and config.ENABLE_TRANSLATIONS:
+                    serialized_event = TranslationService.translate_event_summaries(serialized_event, language)
+                
                 events.append(serialized_event)
                 existing_ids.add(event.id)  # Track new event to avoid duplicates in this batch
                 logger.info(f"Event converted successfully")
@@ -394,6 +412,39 @@ def get_event(event_id):
     
     except Exception as e:
         logger.error(f"Error fetching event: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/events/<event_id>/translate', methods=['POST'])
+def translate_event(event_id):
+    """Translate a specific event's summaries to the target language."""
+    logger.info(f"Translate event {event_id} endpoint called")
+    try:
+        language = request.json.get('language', 'en') if request.json else 'en'
+        
+        # Validate language code
+        if language not in TranslationService.LANGUAGE_CODES:
+            return jsonify({"error": f"Unsupported language: {language}"}), 400
+        
+        # If English, no translation needed
+        if language == 'en':
+            event = _resolve_event(event_id)
+            if event:
+                return jsonify(event), 200
+            return jsonify({"error": "Event not found"}), 404
+        
+        # Get the event
+        event = _resolve_event(event_id)
+        if not event:
+            return jsonify({"error": "Event not found"}), 404
+        
+        # Translate the event summaries
+        translated_event = TranslationService.translate_event_summaries(event, language)
+        logger.info(f"Event {event_id} translated to {language}")
+        
+        return jsonify(translated_event), 200
+    
+    except Exception as e:
+        logger.error(f"Error translating event: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/news/trending', methods=['GET'])
@@ -469,6 +520,14 @@ def update_current_user():
                 "countries": preferences.get("countries", []),
                 "categories": preferences.get("categories", []),
             }
+
+        if "language" in payload and isinstance(payload["language"], str):
+            language = payload["language"].lower()
+            # Validate language code
+            if language in TranslationService.LANGUAGE_CODES:
+                updates["language"] = language
+            else:
+                logger.warning(f"Invalid language code: {language}")
 
         if "onboardingCompleted" in payload:
             updates["onboardingCompleted"] = bool(payload["onboardingCompleted"])

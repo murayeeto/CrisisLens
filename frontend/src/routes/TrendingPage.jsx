@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useEvents } from '../hooks/useEvents'
 import { useTrending } from '../hooks/useTrending'
+import { useAuthSession } from '../providers/AuthSessionProvider'
 import { EventCard } from '../components/event/EventCard'
 import { Panel } from '../components/ui/Panel'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -20,8 +21,9 @@ const matchesFilter = (event, filter) => {
 }
 
 export default function TrendingPage({ onOpenEvent, activeEventId }) {
+  const { profile } = useAuthSession()
   const { data: trending, loading: trendingLoading } = useTrending()
-  const { data: events, loading: eventsLoading } = useEvents()
+  const { data: events, loading: eventsLoading } = useEvents(profile?.language ?? 'en')
   const [activeFilter, setActiveFilter] = useState('All')
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState('Latest')

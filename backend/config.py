@@ -34,5 +34,6 @@ class Config:
     # Feature flags
     USE_MOCK_AUTH = os.getenv("USE_MOCK_AUTH", "false").lower() == "true"
     USE_MOCK_DATA = os.getenv("USE_MOCK_DATA", "true").lower() == "true"  # Default to true until valid API keys provided
+    ENABLE_TRANSLATIONS = os.getenv("ENABLE_TRANSLATIONS", "false").lower() == "true"  # Translations are slow, disabled by default
 
 config = Config()

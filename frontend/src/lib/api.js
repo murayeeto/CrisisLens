@@ -48,8 +48,18 @@ async function fetch_api(path, options = {}) {
 }
 
 export const api = {
-  getEvents: () => fetch_api('/api/events'),
+  getEvents: ({ language } = {}) => {
+    const params = new URLSearchParams()
+    if (language) params.set('language', language)
+    const search = params.toString()
+    return fetch_api(`/api/events${search ? `?${search}` : ''}`)
+  },
   getEvent: (id) => fetch_api(`/api/events/${id}`),
+  translateEvent: (id, language) =>
+    fetch_api(`/api/events/${id}/translate`, {
+      method: 'POST',
+      body: JSON.stringify({ language }),
+    }),
   getTrending: () => fetch_api('/api/news/trending'),
   getCampaigns: ({ eventId, includeInactive } = {}) => {
     const params = new URLSearchParams()

@@ -23,6 +23,7 @@ export default function AccountPage() {
   const navigate = useNavigate()
   const { profile, idToken, updateAccount, signOut } = useAuthSession()
   const [preferencesDraft, setPreferencesDraft] = useState({ countries: [], categories: [] })
+  const [languageDraft, setLanguageDraft] = useState('en')
   const [savingPreferences, setSavingPreferences] = useState(false)
   const [preferencesHelper, setPreferencesHelper] = useState('')
   const [reviewActionId, setReviewActionId] = useState('')
@@ -37,14 +38,15 @@ export default function AccountPage() {
       countries: profile?.preferences?.countries ?? [],
       categories: profile?.preferences?.categories ?? [],
     })
-  }, [profile?.preferences?.categories, profile?.preferences?.countries])
+    setLanguageDraft(profile?.language ?? 'en')
+  }, [profile?.preferences?.categories, profile?.preferences?.countries, profile?.language])
 
   const preferencesChanged =
     JSON.stringify(preferencesDraft) !==
-    JSON.stringify({
-      countries: profile?.preferences?.countries ?? [],
-      categories: profile?.preferences?.categories ?? [],
-    })
+      JSON.stringify({
+        countries: profile?.preferences?.countries ?? [],
+        categories: profile?.preferences?.categories ?? [],
+      }) || languageDraft !== (profile?.language ?? 'en')
 
   const accountUser = useMemo(() => {
     const name = profile?.displayName || profile?.email?.split('@')[0] || 'CrisisLens Member'
@@ -70,6 +72,7 @@ export default function AccountPage() {
     try {
       await updateAccount({
         preferences: preferencesDraft,
+        language: languageDraft,
         onboardingCompleted: true,
       })
       setPreferencesHelper('Saved.')
@@ -113,7 +116,53 @@ export default function AccountPage() {
         <Panel className="p-6 md:p-7">
           <h2 className="font-display text-[30px] font-semibold tracking-tightish text-white md:text-[36px]">Preferences</h2>
 
-          <div className="mt-6">
+          <div className="mt-6 space-y-7">
+            <section>
+              <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-cyan-300">Summary language</div>
+              <div className="mt-3 rounded-[20px] border border-white/8 bg-black/20 px-4 py-3">
+                <select
+                  value={languageDraft}
+                  onChange={(e) => setLanguageDraft(e.target.value)}
+                  disabled={savingPreferences}
+                  className="w-full border-0 bg-transparent text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="en" className="bg-surface text-white">
+                    English
+                  </option>
+                  <option value="es" className="bg-surface text-white">
+                    Español (Spanish)
+                  </option>
+                  <option value="fr" className="bg-surface text-white">
+                    Français (French)
+                  </option>
+                  <option value="de" className="bg-surface text-white">
+                    Deutsch (German)
+                  </option>
+                  <option value="zh" className="bg-surface text-white">
+                    中文 (Chinese)
+                  </option>
+                  <option value="ar" className="bg-surface text-white">
+                    العربية (Arabic)
+                  </option>
+                  <option value="hi" className="bg-surface text-white">
+                    हिन्दी (Hindi)
+                  </option>
+                  <option value="pt" className="bg-surface text-white">
+                    Português (Portuguese)
+                  </option>
+                  <option value="ru" className="bg-surface text-white">
+                    Русский (Russian)
+                  </option>
+                  <option value="ja" className="bg-surface text-white">
+                    日本語 (Japanese)
+                  </option>
+                </select>
+              </div>
+              <p className="mt-2 text-xs text-text-muted">Article summaries will be translated to your preferred language.</p>
+            </section>
+
+            <div className="border-t border-white/8" />
+
             <PreferenceEditor
               value={preferencesDraft}
               onChange={setPreferencesDraft}

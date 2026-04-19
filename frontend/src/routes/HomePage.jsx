@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useEvents } from '../hooks/useEvents'
+import { useAuthSession } from '../providers/AuthSessionProvider'
 import { getUtcLabel } from '../lib/format'
 import { getConnectedEventIds } from '../lib/globeConnections'
 import { getSeverityConfig } from '../lib/severity'
@@ -35,7 +36,8 @@ export default function HomePage({
   activeSeverities,
   onToggleSeverity,
 }) {
-  const { data: events, loading, error, refetch } = useEvents()
+  const { profile } = useAuthSession()
+  const { data: events, loading, error, refetch } = useEvents(profile?.language ?? 'en')
   const [utcTime, setUtcTime] = useState(getUtcLabel())
   const [hoveredEvent, setHoveredEvent] = useState(null)
   const [focusedEventId, setFocusedEventId] = useState(null)

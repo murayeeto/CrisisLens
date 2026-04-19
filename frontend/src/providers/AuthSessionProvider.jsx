@@ -48,6 +48,7 @@ function normalizeProfile(profile, authUser) {
     savedEvents: uniqueIds(Array.isArray(profile?.savedEvents) ? profile.savedEvents.filter(Boolean) : []),
     role: profile?.role ?? 'member',
     preferences,
+    language: profile?.language ?? 'en',
     onboardingCompleted: Boolean(profile?.onboardingCompleted),
   }
 }

@@ -317,7 +317,7 @@ function StorySection({ title, items, onOpenEvent, activeEventId, savedEventIds,
 
 export default function UserPage({ onOpenEvent, activeEventId }) {
   const { profile, idToken, saveEvent: saveUserEvent, unsaveEvent } = useAuthSession()
-  const { data: allEvents, loading: eventsLoading } = useEvents()
+  const { data: allEvents, loading: eventsLoading } = useEvents(profile?.language ?? 'en')
   const [tab, setTab] = useState('watchlists')
   const [savedEvents, setSavedEvents] = useState([])
   const [savedLoading, setSavedLoading] = useState(true)
