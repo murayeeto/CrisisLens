@@ -11,7 +11,26 @@ export const formatCoords = (lat, lng) => {
 export const formatTimeAgo = (value, { compact = false } = {}) => {
   if (!value) return 'just now'
 
-  const date = typeof value === 'string' ? new Date(value) : value
+  let date
+  if (typeof value === 'string') {
+    date = new Date(value)
+  } else if (value instanceof Date) {
+    date = value
+  } else if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+    // Handle Firestore Timestamp objects
+    date = value.toDate()
+  } else if (typeof value === 'number') {
+    // Handle timestamps in milliseconds
+    date = new Date(value)
+  } else {
+    return 'just now'
+  }
+
+  // Ensure we have a valid date
+  if (isNaN(date.getTime())) {
+    return 'just now'
+  }
+
   const diffMs = Date.now() - date.getTime()
   const minute = 60 * 1000
   const hour = 60 * minute
