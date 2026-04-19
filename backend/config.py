@@ -21,7 +21,7 @@ class Config:
 
     # Firebase Admin SDK
     FIREBASE_CREDENTIALS_PATH = os.path.join(
-        os.path.dirname(__file__),
+        os.path.dirname(os.path.dirname(__file__)),
         "crisislens-8cb5d-firebase-adminsdk-fbsvc-7f045dabe9.json"
     )
     FIREBASE_PROJECT_ID = "crisislens-8cb5d"

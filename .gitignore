@@ -66,6 +66,13 @@ yarn-error.log*
 *.bak
 *~
 
+# Test & Debug Scripts (temporary)
+test_*.py
+check_*.py
+list_*.py
+delete_*.py
+*_test.py
+
 # Secrets & Credentials - NEVER commit these
 *.key
 *.pem

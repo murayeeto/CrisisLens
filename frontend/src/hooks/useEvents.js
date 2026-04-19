@@ -13,38 +13,10 @@ export function useEvents() {
     setLoading(true)
     setError(null)
     try {
-      // Check cache first
-      const cached = getCached('events')
-      if (cached) {
-        console.log('[useEvents] Loading from cache')
-        setData(Array.isArray(cached) ? cached : [])
-        setLoading(false)
-        
-        // Still load from Firestore in background for fresh data
-        try {
-          const firestoreEvents = await getEventsFromFirestore()
-          setData(firestoreEvents)
-          setCached('events', firestoreEvents)
-        } catch (err) {
-          console.warn('[useEvents] Background Firestore sync failed:', err.message)
-          // If Firestore fails due to permissions, try API
-          if (err.message.includes('permission')) {
-            try {
-              const apiEvents = await api.getEvents()
-              setData(apiEvents)
-              setCached('events', apiEvents)
-            } catch (apiErr) {
-              console.warn('[useEvents] API fallback also failed:', apiErr.message)
-            }
-          }
-        }
-        return
-      }
-
       console.log('[useEvents] Fetching events from Firestore...')
       
       try {
-        // Try to get events from Firestore
+        // Always load from Firestore first (skip cache)
         let firestoreEvents = await getEventsFromFirestore()
         
         // If Firestore is empty, run migration from API
@@ -64,7 +36,7 @@ export function useEvents() {
         console.log('[useEvents] Sample events:', firestoreEvents.slice(0, 3).map(e => ({ id: e.id, title: e.title, lat: e.lat, lng: e.lng })))
         setData(firestoreEvents)
         
-        // Cache for offline access
+        // Cache for offline access (but always load fresh from Firebase first)
         setCached('events', firestoreEvents)
       } catch (firestoreErr) {
         // If Firestore fails (e.g., permission error), fall back to API

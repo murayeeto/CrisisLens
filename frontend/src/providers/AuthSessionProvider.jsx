@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import { getIdToken, login, logout, onAuthStateChange, signup } from '../lib/firebaseAuth'
+import { getIdToken, login, logout, onAuthStateChange, signup, signInWithGoogle } from '../lib/firebaseAuth'
 import {
   addSavedEvent as addSavedEventDocument,
   getUserDocument,
@@ -203,6 +203,17 @@ export function AuthSessionProvider({ children }) {
     [],
   )
 
+  const signInGoogle = useCallback(async () => {
+    setError(null)
+    setAuthLoading(true)
+    try {
+      return await signInWithGoogle()
+    } catch (error) {
+      setAuthLoading(false)
+      throw error
+    }
+  }, [])
+
   const signOutUser = useCallback(async () => {
     await logout()
     setUser(null)
@@ -336,6 +347,7 @@ export function AuthSessionProvider({ children }) {
       isAuthenticated: Boolean(user),
       signIn,
       signUp,
+      signInGoogle,
       signOut: signOutUser,
       refreshProfile,
       updateAccount,
@@ -352,6 +364,7 @@ export function AuthSessionProvider({ children }) {
       profileLoading,
       signIn,
       signUp,
+      signInGoogle,
       signOutUser,
       refreshProfile,
       updateAccount,

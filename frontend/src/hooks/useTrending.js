@@ -11,22 +11,14 @@ export function useTrending() {
     setLoading(true)
     setError(null)
     try {
-      // Check cache first
-      const cached = getCached('trending')
-      if (cached) {
-        console.log('[useTrending] Loading from cache')
-        setData(Array.isArray(cached) ? cached : [])
-        setLoading(false)
-        return
-      }
-
+      // Always load fresh from API (skip cache)
       console.log('[useTrending] Fetching trending news from API...')
       const response = await api.getTrending()
       console.log('[useTrending] Successfully fetched', Array.isArray(response) ? response.length : 0, 'articles')
       const trendingData = Array.isArray(response) ? response : []
       setData(trendingData)
       
-      // Store in cache
+      // Store in cache for offline access (but always load fresh from API first)
       setCached('trending', trendingData)
     } catch (err) {
       console.error('[useTrending] Failed to fetch trending news:', err.message)

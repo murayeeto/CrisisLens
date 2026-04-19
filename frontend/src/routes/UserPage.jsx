@@ -204,13 +204,18 @@ function FeaturedStoryCard({ event, active, saved, onOpenEvent, onToggleSave }) 
 
   return (
     <Panel
-      as="button"
-      type="button"
       interactive
       spotlight
       active={active}
       onClick={() => onOpenEvent(event.id, 'for-you')}
-      className="group w-full overflow-hidden p-0 text-left"
+      className="group w-full cursor-pointer overflow-hidden p-0 text-left"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          onOpenEvent(event.id, 'for-you')
+        }
+      }}
     >
       <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
         <div className="relative min-h-[280px] overflow-hidden">

@@ -4,7 +4,7 @@
  */
 
 const CACHE_PREFIX = 'crisislens_cache_'
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
 /**
  * Get cached data if it exists and hasn't expired

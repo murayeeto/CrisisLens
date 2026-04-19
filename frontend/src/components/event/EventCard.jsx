@@ -33,13 +33,18 @@ export function EventCard({
 
   return (
     <Panel
-      as="button"
-      type="button"
       interactive
       spotlight
       active={active}
       onClick={onClick}
-      className="group w-full overflow-hidden p-0 text-left"
+      className="group w-full cursor-pointer overflow-hidden p-0 text-left"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          onClick?.()
+        }
+      }}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio: '16 / 10' }}>
         <img

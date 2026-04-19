@@ -6,11 +6,12 @@ import { Button } from '../ui/Button'
 
 export const LoginForm = () => {
   const location = useLocation()
-  const { signIn } = useAuthSession()
+  const { signIn, signInGoogle } = useAuthSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [helper, setHelper] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,6 +24,19 @@ export const LoginForm = () => {
       setHelper("That combination didn't work yet. Check the email and password, then try again.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setHelper('')
+    setGoogleLoading(true)
+
+    try {
+      await signInGoogle()
+    } catch (err) {
+      setHelper(err.message || 'Failed to sign in with Google. Please try again.')
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -70,14 +84,37 @@ export const LoginForm = () => {
         </Button>
 
         {helper ? <p className="text-sm leading-7 text-cyan-100">{helper}</p> : null}
-
-        <p className="text-sm text-text-secondary">
-          New here?{' '}
-          <Link to="/signup" state={location.state} className="text-cyan-300 transition hover:text-white">
-            Create an account
-          </Link>
-        </p>
       </form>
+
+      {/* Divider */}
+      <div className="my-6 flex items-center gap-3">
+        <div className="flex-1 border-t border-white/10"></div>
+        <span className="text-xs uppercase tracking-[0.12em] text-text-muted">or</span>
+        <div className="flex-1 border-t border-white/10"></div>
+      </div>
+
+      {/* Google Sign In Button */}
+      <button
+        onClick={handleGoogleSignIn}
+        disabled={googleLoading}
+        className="w-full inline-flex items-center justify-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.03] px-4 py-3 text-white transition hover:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-45 text-sm font-medium"
+      >
+        {googleLoading ? (
+          <Loader className="h-4 w-4 animate-spin" />
+        ) : (
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.91 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
+          </svg>
+        )}
+        {googleLoading ? 'Signing in...' : 'Sign in with Google'}
+      </button>
+
+      <p className="mt-6 text-sm text-text-secondary">
+        New here?{' '}
+        <Link to="/signup" state={location.state} className="text-cyan-300 transition hover:text-white">
+          Create an account
+        </Link>
+      </p>
     </div>
   )
 }

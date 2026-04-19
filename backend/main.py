@@ -278,13 +278,22 @@ def get_events():
                 logger.warning("Firebase not initialized, skipping Firestore load")
                 raise Exception("Firebase not available")
             firestore_events = []
+            seen_ids = set()
             
             # Query all events from Firestore
             docs = db.collection('events').stream()
             for doc in docs:
                 event_data = doc.to_dict()
+                event_id = event_data.get('id')
+                
+                # Skip duplicates
+                if event_id in seen_ids:
+                    logger.warning(f"Skipping duplicate event: {event_id}")
+                    continue
+                seen_ids.add(event_id)
+                
                 firestore_events.append({
-                    "id": event_data.get('id'),
+                    "id": event_id,
                     "title": event_data.get('title'),
                     "description": event_data.get('description'),
                     "severity": event_data.get('severity', 'info'),
@@ -307,7 +316,7 @@ def get_events():
                 })
             
             if firestore_events:
-                logger.info(f"✓ Loaded {len(firestore_events)} events from Firestore")
+                logger.info(f"✓ Loaded {len(firestore_events)} unique events from Firestore")
                 return jsonify(firestore_events), 200
             else:
                 logger.info("No events found in Firestore, will generate new ones")
@@ -322,12 +331,31 @@ def get_events():
             logger.warning("No articles available from news service")
             return jsonify([]), 200
         
+        # Get existing event IDs from Firestore to avoid duplicates
+        existing_ids = set()
+        try:
+            db = firebase_service._db
+            if db:
+                docs = db.collection('events').stream()
+                for doc in docs:
+                    event_data = doc.to_dict()
+                    existing_ids.add(event_data.get('id'))
+                logger.info(f"Found {len(existing_ids)} existing events in Firestore")
+        except Exception as e:
+            logger.warning(f"Could not fetch existing IDs: {e}")
+        
         # Convert articles to events and store in Firestore
         events = []
         for article in articles[:20]:  # Limit to 20 events
             try:
                 logger.info(f"Converting article '{article.title}' to event...")
                 event = event_service.create_event_from_articles([article])
+                
+                # Skip if event already exists
+                if event.id in existing_ids:
+                    logger.info(f"Event {event.id} already exists, skipping duplicate")
+                    continue
+                
                 logger.info(f"Event created: {event.id}. Location: {event.location.name if event.location else 'None'}")
                 
                 # Ensure location has required attributes
@@ -338,12 +366,13 @@ def get_events():
                 serialized_event = _serialize_event(event)
                 _persist_event_snapshot(serialized_event)
                 events.append(serialized_event)
+                existing_ids.add(event.id)  # Track new event to avoid duplicates in this batch
                 logger.info(f"Event converted successfully")
             except Exception as e:
                 logger.error(f"Error converting article to event: {e}", exc_info=True)
                 continue
         
-        logger.info(f"Returning {len(events)} events")
+        logger.info(f"Returning {len(events)} new events")
         return jsonify(events), 200
     
     except Exception as e:

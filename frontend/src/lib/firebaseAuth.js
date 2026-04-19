@@ -4,6 +4,8 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
 } from 'firebase/auth'
 import { auth } from './firebase'
 import { createUserDocument } from './firebaseFirestore'
@@ -69,4 +71,40 @@ export const getIdToken = async (user) => {
 
 export const onAuthStateChange = (callback) => {
   return onAuthStateChanged(auth, callback)
+}
+
+export const signInWithGoogle = async () => {
+  try {
+    const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({
+      prompt: 'select_account',
+    })
+    
+    const userCredential = await signInWithPopup(auth, provider)
+    const user = userCredential.user
+
+    // Create user document if it doesn't exist
+    await createUserDocument(user.uid, {
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      role: 'member',
+      createdAt: new Date().toISOString(),
+      savedEvents: [],
+      preferences: {
+        countries: [],
+        categories: [],
+      },
+      onboardingCompleted: false,
+    }).catch(() => {
+      // Document may already exist, that's fine
+    })
+
+    return user
+  } catch (error) {
+    if (error.code === 'auth/popup-closed-by-user') {
+      throw new Error('Sign in was cancelled')
+    }
+    throw new Error(error.message)
+  }
 }
