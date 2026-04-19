@@ -131,6 +131,15 @@ export default function CrisisGlobe({
   onViewChange,
 }) {
   const reducedMotion = useReducedMotion()
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[CrisisGlobe] Received', events.length, 'events')
+    console.log('[CrisisGlobe] Active severities:', activeSeverities)
+    if (events.length > 0) {
+      console.log('[CrisisGlobe] Sample event:', events[0])
+    }
+  }, [events, activeSeverities])
   const containerRef = useRef(null)
   const globeRef = useRef(null)
   const resumeRotateRef = useRef(null)
@@ -156,12 +165,36 @@ export default function CrisisGlobe({
     [activeSeverities, events],
   )
 
+  useEffect(() => {
+    console.log('[CrisisGlobe] Base visible events:', baseVisibleEvents.length, 'from total:', events.length)
+    if (baseVisibleEvents.length < events.length) {
+      console.log('[CrisisGlobe] Filtered by severities:', activeSeverities)
+    }
+  }, [baseVisibleEvents, events, activeSeverities])
+
   const visibleEvents = useMemo(() => {
     if (!focusedEventId) return baseVisibleEvents
 
     const connectedIds = getConnectedEventIds(focusedEventId)
     return baseVisibleEvents.filter((event) => connectedIds.has(event.id))
   }, [baseVisibleEvents, focusedEventId])
+
+  useEffect(() => {
+    console.log('[CrisisGlobe] Visible events after focus filter:', visibleEvents.length)
+    if (focusedEventId) {
+      console.log('[CrisisGlobe] Focused on event:', focusedEventId)
+    }
+    
+    // Log all event coordinates to see distribution
+    console.log('[CrisisGlobe] All event locations:')
+    visibleEvents.forEach((event, idx) => {
+      console.log(`  [${idx}] ${event.title.substring(0, 40)}... → lat: ${event.lat}, lng: ${event.lng}, severity: ${event.severity}`)
+    })
+    
+    // Check for coordinate diversity
+    const uniqueCoords = new Set(visibleEvents.map(e => `${e.lat},${e.lng}`))
+    console.log(`[CrisisGlobe] Unique coordinate pairs: ${uniqueCoords.size} out of ${visibleEvents.length}`)
+  }, [visibleEvents, focusedEventId])
 
   const arcs = useMemo(() => {
     return linkedPairs
@@ -252,6 +285,11 @@ export default function CrisisGlobe({
     let active = true
     const textureLoader = new THREE.TextureLoader()
 
+    const updateSunPosition = () => {
+      const [lng, lat] = getSunPosition(new Date())
+      globeMaterialRef.current?.uniforms.sunPosition.value.set(lng, lat)
+    }
+
     Promise.all([textureLoader.loadAsync('/earth-day.jpg'), textureLoader.loadAsync('/earth-night.jpg')])
       .then(([dayTexture, nightTexture]) => {
         if (!active) {
@@ -277,6 +315,7 @@ export default function CrisisGlobe({
 
         globeMaterialRef.current = material
         setGlobeMaterial(material)
+        updateSunPosition()
       })
       .catch((error) => {
         console.error('Failed to initialize globe day/night textures:', error)
@@ -400,16 +439,25 @@ export default function CrisisGlobe({
         
         // Update pin visibility based on current camera position
         // Query the entire document since pins are rendered inside the Globe canvas container
+        let visibleCount = 0
+        let hiddenCount = 0
+        
         visibleEvents.forEach((event) => {
           const elements = document.querySelectorAll(`[data-event-id="${event.id}"]`)
           elements.forEach((element) => {
             if (isPointVisible(event.lat, event.lng)) {
               element.style.visibility = 'visible'
+              visibleCount++
             } else {
               element.style.visibility = 'hidden'
+              hiddenCount++
             }
           })
         })
+        
+        if (visibleCount + hiddenCount > 0) {
+          console.log(`[CrisisGlobe] Visibility: ${visibleCount} visible, ${hiddenCount} hidden (Total: ${visibleCount + hiddenCount})`)
+        }
       }
     }, 140)
 
@@ -516,6 +564,9 @@ export default function CrisisGlobe({
               <div class="crisis-pin__core"></div>
             `
 
+            // Debug: log pin creation
+            console.log(`[CrisisGlobe] Creating pin for "${d.title.substring(0, 30)}..." at (${d.lat}, ${d.lng})`)
+            
             // Click handler with event prevention
             const handleClick = (event) => {
               event.preventDefault()

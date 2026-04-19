@@ -60,6 +60,8 @@ export function useEvents() {
         }
         
         console.log('[useEvents] Successfully fetched', firestoreEvents.length, 'events from Firestore')
+        console.log('[useEvents] Events with lat/lng:', firestoreEvents.filter(e => e.lat && e.lng).length)
+        console.log('[useEvents] Sample events:', firestoreEvents.slice(0, 3).map(e => ({ id: e.id, title: e.title, lat: e.lat, lng: e.lng })))
         setData(firestoreEvents)
         
         // Cache for offline access

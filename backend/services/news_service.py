@@ -8,53 +8,53 @@ from datetime import datetime, timedelta
 MOCK_ARTICLES = [
     {
         "id": "mock-1",
-        "title": "Earthquake Strikes West Coast",
-        "description": "A 6.2 magnitude earthquake hit California early this morning, causing minor damage and power outages.",
+        "title": "Earthquake Strikes California Bay Area - 6.2 Magnitude",
+        "description": "A 6.2 magnitude earthquake hit the San Francisco Bay Area early this morning, causing minor damage and power outages affecting 50,000 residents.",
         "image_url": "https://via.placeholder.com/400x300?text=Earthquake",
         "source_name": "CNN",
         "published_at": (datetime.now() - timedelta(hours=2)).isoformat(),
         "url": "https://example.com/article1",
-        "content": "A significant 6.2 magnitude earthquake struck the San Francisco Bay Area. Emergency services are responding to reports of structural damage in several neighborhoods."
+        "content": "A significant 6.2 magnitude earthquake struck the San Francisco Bay Area at 4:15 AM local time. Emergency services are responding to reports of structural damage in several neighborhoods. The USGS reports the epicenter was near Oakland, California at coordinates 37.8044, -122.2712. Minor injuries reported."
     },
     {
         "id": "mock-2",
-        "title": "Humanitarian Aid Reaches Flood Zone",
-        "description": "International humanitarian organizations deliver emergency supplies to flood-affected regions.",
+        "title": "Devastating Floods Hit Pakistan - Thousands Evacuated",
+        "description": "International humanitarian organizations mobilize as unprecedented monsoon flooding affects Sindh province, displacing over 20,000 families.",
         "image_url": "https://via.placeholder.com/400x300?text=Flood",
         "source_name": "BBC",
         "published_at": (datetime.now() - timedelta(hours=4)).isoformat(),
         "url": "https://example.com/article2",
-        "content": "Rescue teams in the Sindh province of Pakistan are delivering aid to thousands affected by unprecedented flooding along the Indus River."
+        "content": "Rescue teams in Sindh province, Pakistan (coordinates 24.9056, 67.0822) are conducting emergency operations as catastrophic flooding along the Indus River threatens thousands of communities. Water levels reaching record highs. International aid coordinating from Karachi."
     },
     {
         "id": "mock-3",
-        "title": "Wildfire Spreads Across Australian Territory",
-        "description": "Massive wildfire in Queensland, Australia forces thousands to evacuate their homes.",
+        "title": "Massive Wildfire Threatens Queensland Australia - Evacuation Order",
+        "description": "More than 12,000 residents evacuated as rapidly spreading wildfire engulfs 75,000 acres in Queensland bushland.",
         "image_url": "https://via.placeholder.com/400x300?text=Wildfire",
         "source_name": "ABC News",
         "published_at": (datetime.now() - timedelta(hours=6)).isoformat(),
         "url": "https://example.com/article3",
-        "content": "More than 5,000 residents have been evacuated as a rapidly spreading wildfire threatens communities in Queensland. Fire services report the blaze covers over 50,000 acres."
+        "content": "A major bushfire near Brisbane, Queensland (-27.4698, 153.0251) has forced evacuation orders affecting over 12,000 residents. The fire has spread across more than 75,000 acres in just 48 hours. Air quality warnings issued for broader region."
     },
     {
         "id": "mock-4",
-        "title": "Typhoon Warning Issued for Southeast Asia",
-        "description": "Meteorological agencies issue level 4 typhoon warning for Philippines and Vietnam regions.",
+        "title": "Typhoon Warning Level 4 - Philippines Braces for Impact",
+        "description": "Meteorological agencies issue highest typhoon alert as Category 4 system approaches Manila directly, evacuation procedures activated.",
         "image_url": "https://via.placeholder.com/400x300?text=Typhoon",
         "source_name": "Reuters",
         "published_at": (datetime.now() - timedelta(hours=8)).isoformat(),
         "url": "https://example.com/article4",
-        "content": "A Category 4 typhoon is expected to make landfall in the Philippines within 48 hours. The government has activated emergency protocols and begun evacuation procedures."
+        "content": "A Category 4 typhoon is expected to make direct landfall near Manila, Philippines (14.5995, 120.9842) within 24 hours. The government has activated maximum emergency protocols. Estimated 500,000+ residents in potential impact zone. Landslide warnings active."
     },
     {
         "id": "mock-5",
-        "title": "Volcanic Eruption Alert in Indonesia",
-        "description": "Mount Merapi shows increased seismic activity with ash column rising 2km into the air.",
+        "title": "Mount Merapi Volcanic Eruption Alert - Indonesia Issues Evacuation",
+        "description": "Indonesia's most active volcano shows increased seismic activity with ash column rising 3.5km, forcing evacuation of villages within 5km radius.",
         "image_url": "https://via.placeholder.com/400x300?text=Volcano",
         "source_name": "USGS",
         "published_at": (datetime.now() - timedelta(hours=12)).isoformat(),
         "url": "https://example.com/article5",
-        "content": "Indonesia's Mount Merapi has increased volcanic activity. Scientists report elevated magma pressure and ash emissions. Residents within 3km radius have been advised to evacuate."
+        "content": "Mount Merapi in Central Java, Indonesia (7.5426, 110.4420) shows critical volcanic activity. Ash emissions reaching 3,500 meters altitude. Evacuations ongoing for 40 villages. USGS alert level at maximum. Latest seismic data indicates magma movement."
     },
     {
         "id": "mock-6",
@@ -68,54 +68,52 @@ MOCK_ARTICLES = [
     },
     {
         "id": "mock-7",
-        "title": "Tornado Devastates Oklahoma Farming Communities",
-        "description": "Multiple tornadoes reported across Oklahoma causing significant damage to homes and infrastructure.",
+        "title": "Powerful Tornado Strikes Oklahoma - Multiple Communities Affected",
+        "description": "Devastating EF4 tornado tears through Norman, Oklahoma, destroying homes and causing power outages affecting 100,000+ residents.",
         "image_url": "https://via.placeholder.com/400x300?text=Tornado",
         "source_name": "The Weather Channel",
         "published_at": (datetime.now() - timedelta(hours=16)).isoformat(),
         "url": "https://example.com/article7",
-        "content": "A series of powerful tornadoes swept through northwest Oklahoma, damaging dozens of homes and destroying crops across multiple counties. One fatality reported."
+        "content": "A powerful EF4 tornado swept through Norman, Oklahoma (35.3395, -97.4867) at 4:30 PM, destroying entire neighborhoods and leaving widespread damage. The National Weather Service reports sustained winds exceeding 170 mph. Multiple fatalities reported."
     },
     {
         "id": "mock-8",
-        "title": "Landslide Blocks Major Highway in Nepal",
-        "description": "Heavy monsoon rains trigger landslide blocking main trade route between India and Nepal.",
+        "title": "Major Landslide Closes Nepal-India Highway - Hundreds Stranded",
+        "description": "Monsoon rains trigger massive landslide on critical trade route, cutting off supply lines for thousands.",
         "image_url": "https://via.placeholder.com/400x300?text=Landslide",
         "source_name": "Asia Times",
         "published_at": (datetime.now() - timedelta(hours=18)).isoformat(),
         "url": "https://example.com/article8",
-        "content": "The main highway between Kathmandu and India's northern border remains closed after a massive landslide triggered by three days of continuous rain."
+        "content": "A massive landslide near Kathmandu, Nepal (27.7172, 85.3240) has completely blocked the main highway connecting to India. Hundreds of vehicles stranded. Continuous rain forecast for next 72 hours increases avalanche risk."
     },
     {
         "id": "mock-9",
-        "title": "Drought Crisis Threatens Horn of Africa",
-        "description": "Severe drought conditions affect millions across Ethiopia, Somalia, and Kenya regions.",
+        "title": "Severe Drought Crisis in Horn of Africa - Humanitarian Emergency",
+        "description": "Worst drought in 40 years threatens 20 million people across Ethiopia, Somalia, and Kenya with famine.",
         "image_url": "https://via.placeholder.com/400x300?text=Drought",
         "source_name": "UN News",
         "published_at": (datetime.now() - timedelta(hours=20)).isoformat(),
         "url": "https://example.com/article9",
-        "content": "A devastating drought affecting the Horn of Africa has left millions at risk of famine. The UN warns that urgent humanitarian intervention is needed to prevent catastrophe."
+        "content": "A severe drought affecting the Horn of Africa from Ethiopia (9.1450, 40.4897) through Somalia and Kenya has left 20 million people at critical risk. The UN warns this is the worst drought in 40 years. Urgent humanitarian intervention needed."
     },
     {
         "id": "mock-10",
-        "title": "Industrial Accident Evacuates City District",
-        "description": "Chemical plant explosion in Brazil forces evacuation of nearby residential areas.",
+        "title": "Chemical Plant Explosion in Brazil - Industrial Disaster",
+        "description": "Major explosion at petrochemical facility in São Paulo causes casualties and forces mass evacuation of surrounding neighborhoods.",
         "image_url": "https://via.placeholder.com/400x300?text=Accident",
         "source_name": "Globo News",
         "published_at": (datetime.now() - timedelta(hours=22)).isoformat(),
         "url": "https://example.com/article10",
-        "content": "An explosion at a petrochemical facility in São Paulo state has injured 15 workers and forced the evacuation of surrounding neighborhoods as a precaution."
+        "content": "A catastrophic explosion at a petrochemical facility in Cubatão, São Paulo (-23.8844, -46.4228) has resulted in 15 confirmed fatalities and injuries to dozens of workers. Evacuation orders issued for all residents within 5km radius. Toxic chemical plume detected."
     },
 ]
 
 class NewsService:
     @staticmethod
     def fetch_trending_news() -> List[NewsArticle]:
-        """Fetch trending news from newsapi.ai or return mock data."""
-        if config.USE_MOCK_DATA or not config.NEWS_API_KEY:
-            logger.warning("Using mock news data (set USE_MOCK_DATA=false and NEWS_API_KEY to use real API)")
-            return [NewsArticle(**article) for article in MOCK_ARTICLES]
+        """Fetch trending news from newsapi.ai - ALWAYS use real API data, never mock."""
         
+        # Always try real API - don't use mock data
         try:
             # Calculate date range for last 3 days
             now = datetime.now()
@@ -123,27 +121,41 @@ class NewsService:
             start_date = three_days_ago.strftime("%Y-%m-%d")
             end_date = now.strftime("%Y-%m-%d")
             
-            # Using newsapi.ai endpoint for crisis/disaster news with multiple keywords
+            # Using newsapi.ai endpoint for any news articles (regardless of crisis)
+            # We'll extract real location from any article
             url = "https://newsapi.ai/api/v1/article/getArticles"
             
-            # Search for multiple crisis/disaster related keywords
+            # Broad search terms to get diverse articles with real locations
             keywords = [
-                "earthquake OR seismic",
-                "flood OR flooding",
-                "wildfire OR forest fire",
-                "hurricane OR typhoon OR cyclone",
-                "tsunami OR wave",
-                "landslide OR mudslide",
-                "tornado OR storm",
-                "drought OR famine",
-                "volcanic OR eruption",
-                "accident OR disaster"
+                "earthquake",
+                "flood", 
+                "wildfire",
+                "hurricane",
+                "tsunami",
+                "landslide",
+                "tornado",
+                "drought",
+                "volcanic",
+                "accident",
+                "disaster",
+                "storm",
+                "weather",
+                "earthquake",
+                "fire",
+                "emergency",
+                "alert",
+                "warning",
+                "crisis",
+                "incident"
             ]
             
             all_articles = []
             
             # Fetch articles for each keyword
             for keyword in keywords:
+                if len(all_articles) >= 20:
+                    break  # Stop once we have 20
+                
                 try:
                     params = {
                         "apiKey": config.NEWS_API_KEY,
@@ -154,7 +166,7 @@ class NewsService:
                         "dateEnd": end_date
                     }
                     
-                    logger.info(f"Fetching articles from newsapi.ai for keyword: {keyword} (last 3 days)")
+                    logger.info(f"Fetching articles from newsapi.ai for keyword: {keyword}")
                     response = requests.get(url, params=params, timeout=8)
                     response.raise_for_status()
                     data = response.json()
@@ -164,11 +176,14 @@ class NewsService:
                     logger.info(f"API returned {len(results)} results for '{keyword}'")
                     
                     for article in results:
+                        if len(all_articles) >= 20:
+                            break
+                            
                         try:
                             normalized = NewsArticle(
                                 id=article.get("uri", ""),
                                 title=article.get("title", ""),
-                                description=article.get("body", "")[:500] if article.get("body") else "",  # Truncate body
+                                description=article.get("body", "")[:500] if article.get("body") else "",
                                 image_url=article.get("image", ""),
                                 source_name=article.get("source", {}).get("title", "Unknown") if isinstance(article.get("source"), dict) else "Unknown",
                                 published_at=article.get("dateTimePub", article.get("dateTime", "")),
@@ -179,7 +194,7 @@ class NewsService:
                             # Check if article already exists (by URL) to avoid duplicates
                             if not any(a.url == normalized.url for a in all_articles):
                                 all_articles.append(normalized)
-                                logger.debug(f"Parsed article: {normalized.title[:50]}")
+                                logger.info(f"✓ Added article: {normalized.title[:60]}")
                         except Exception as e:
                             logger.warning(f"Error parsing article: {e}")
                             continue
@@ -187,17 +202,20 @@ class NewsService:
                     logger.warning(f"Error fetching articles for keyword '{keyword}': {e}")
                     continue
             
-            logger.info(f"Fetched total {len(all_articles)} unique articles from newsapi.ai (last 3 days)")
-            return all_articles
-        
+            if all_articles:
+                logger.info(f"✓ Successfully fetched {len(all_articles)} real articles from newsapi.ai")
+                return all_articles
+            else:
+                raise Exception("No articles found from API")
+            
         except requests.Timeout:
-            logger.error(f"newsapi.ai request timed out after 8 seconds. Falling back to mock data.")
-            return [NewsArticle(**article) for article in MOCK_ARTICLES]
+            logger.error(f"newsapi.ai request timed out. Retrying...")
+            raise
         except requests.ConnectionError as e:
-            logger.error(f"newsapi.ai connection error: {e}. Falling back to mock data.")
-            return [NewsArticle(**article) for article in MOCK_ARTICLES]
+            logger.error(f"newsapi.ai connection error: {e}")
+            raise
         except Exception as e:
-            logger.error(f"newsapi.ai error: {e}. Falling back to mock data.", exc_info=True)
-            return [NewsArticle(**article) for article in MOCK_ARTICLES]
+            logger.error(f"newsapi.ai error: {e}", exc_info=True)
+            raise
 
 news_service = NewsService()

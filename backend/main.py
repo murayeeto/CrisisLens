@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime, timedelta
 from config import config
 from utils.logger import logger
-from services.firebase_service import firebase_service
+from services.firebase_service import firebase_service, FirebaseService
 from services.news_service import news_service
 from services.event_service import event_service
 from middleware.auth_middleware import require_auth
@@ -62,7 +62,7 @@ def get_events():
         
         # Convert articles to events
         events = []
-        for article in articles[:10]:  # Limit to 10 events
+        for article in articles[:20]:  # Limit to 20 events
             try:
                 logger.info(f"Converting article '{article.title}' to event...")
                 event = event_service.create_event_from_articles([article])
@@ -109,10 +109,26 @@ def get_events():
 
 @app.route('/api/events/<event_id>', methods=['GET'])
 def get_event(event_id):
-    """Fetch a specific event by ID. Regenerates from news articles if not in cache."""
+    """Fetch a specific event by ID from Firestore."""
     logger.info(f"Get event {event_id} endpoint called")
     try:
-        # Try to get from in-memory store first
+        # Try to get from Firestore first
+        db = FirebaseService._db
+        if not db:
+            logger.info("DB not initialized, initializing...")
+            FirebaseService.initialize()
+            db = FirebaseService._db
+        
+        logger.info(f"Querying Firestore for event {event_id}...")
+        doc = db.collection('events').document(event_id).get()
+        
+        if doc.exists:
+            event_data = doc.to_dict()
+            logger.info(f"Event {event_id} found in Firestore")
+            return jsonify(event_data), 200
+        
+        # Fallback to in-memory store
+        logger.info(f"Event {event_id} not in Firestore, checking in-memory store...")
         event = event_service.get_event(event_id)
         if event:
             logger.info(f"Event {event_id} found in store")
@@ -133,37 +149,7 @@ def get_event(event_id):
                 "sources": [{"name": a.source_name, "url": a.url} for a in event.source_articles] if event.source_articles else [],
             }), 200
         
-        # If not in store, regenerate from articles (deterministic ID allows this)
-        logger.info(f"Event {event_id} not in store, regenerating from articles...")
-        articles = news_service.fetch_trending_news()
-        
-        # Recreate events until we find matching ID
-        for i, article in enumerate(articles[:10]):
-            try:
-                event = event_service.create_event_from_articles([article])
-                if event.id == event_id:
-                    logger.info(f"Event {event_id} regenerated from articles")
-                    return jsonify({
-                        "id": event.id,
-                        "title": event.title,
-                        "description": event.description,
-                        "severity": event.ai_analysis.severity if event.ai_analysis else "high",
-                        "location": event.location.name if event.location else "Unknown",
-                        "lat": float(event.location.latitude) if event.location else 0,
-                        "lng": float(event.location.longitude) if event.location else 0,
-                        "previewImage": event.image_url or "",
-                        "aiSummary": event.ai_analysis.summary if event.ai_analysis else event.description,
-                        "affectedGroups": event.ai_analysis.affected_groups if event.ai_analysis else [],
-                        "impactAnalysis": event.ai_analysis.impact_analysis if event.ai_analysis else "",
-                        "howToHelp": event.ai_analysis.how_to_help if event.ai_analysis else "",
-                        "watchGuidance": event.ai_analysis.watch_guidance if event.ai_analysis else "",
-                        "sources": [{"name": a.source_name, "url": a.url} for a in event.source_articles] if event.source_articles else [],
-                    }), 200
-            except Exception as e:
-                logger.warning(f"Could not create event from article {i}: {e}")
-                continue
-        
-        logger.warning(f"Event {event_id} not found after regeneration")
+        logger.warning(f"Event {event_id} not found in Firestore or store")
         return jsonify({"error": "Event not found"}), 404
     
     except Exception as e:

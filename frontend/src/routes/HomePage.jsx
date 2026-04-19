@@ -47,6 +47,13 @@ export default function HomePage({
   }, [])
 
   useEffect(() => {
+    console.log('[HomePage] Events loaded:', events.length, 'Loading:', loading)
+    if (events.length > 0) {
+      console.log('[HomePage] Sample events:', events.slice(0, 2).map(e => ({ id: e.id, title: e.title, severity: e.severity, lat: e.lat, lng: e.lng })))
+    }
+  }, [events, loading])
+
+  useEffect(() => {
     if (detailEventId) {
       setFocusedEventId(detailEventId)
     }
