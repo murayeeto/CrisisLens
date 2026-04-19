@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 from datetime import datetime
 from typing import List, Optional
 from models import Event, NewsArticle, Location
@@ -15,12 +16,21 @@ class EventService:
     def create_event_from_articles(articles: List[NewsArticle]) -> Event:
         """
         Convert a list of articles into a structured event with AI analysis.
+        Uses deterministic event ID based on article URL for consistent lookups.
         """
         if not articles:
             raise ValueError("At least one article is required")
         
         # Use first article as primary
         primary = articles[0]
+        
+        # Generate deterministic event ID from article URL
+        event_id = hashlib.md5(primary.url.encode()).hexdigest()
+        
+        # Check if event already exists in store
+        if event_id in _event_store:
+            logger.info(f"Event {event_id} already exists in store")
+            return _event_store[event_id]
         
         # Extract location from articles
         location_text = extract_location_from_text(
@@ -44,7 +54,7 @@ class EventService:
         
         # Create event
         event = Event(
-            id=str(uuid.uuid4()),
+            id=event_id,
             title=primary.title,
             description=primary.description or "Event detected from news sources.",
             image_url=primary.image_url,

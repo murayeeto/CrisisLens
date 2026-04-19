@@ -11,31 +11,43 @@ MOCK_LOCATIONS = {
     "sydney": Location(name="Sydney, Australia", latitude=-33.8688, longitude=151.2093, country="Australia", region="NSW"),
 }
 
+# Cache for geocoding results to avoid repeated API calls
+_geocoding_cache = {}
+
 class GeocodingService:
     @staticmethod
     def geocode_location(location_name: str) -> Location:
         """
         Geocode a location name to lat/lng using Google Maps API or fallback.
+        Uses caching to avoid repeated API calls for the same location.
         """
         if not location_name:
             return Location(name="Unknown", latitude=0.0, longitude=0.0)
         
         location_name_lower = location_name.lower()
         
+        # Check cache first
+        if location_name_lower in _geocoding_cache:
+            logger.debug(f"Cache hit for location '{location_name}'")
+            return _geocoding_cache[location_name_lower]
+        
         # Check mock locations first
         for key, loc in MOCK_LOCATIONS.items():
             if key in location_name_lower:
                 logger.info(f"Geocoded '{location_name}' using mock data: {loc.name}")
+                _geocoding_cache[location_name_lower] = loc  # Cache the result
                 return loc
         
         if config.USE_MOCK_DATA or not config.MAPS_API_KEY:
             logger.warning(f"No mock location for '{location_name}'. Using fallback.")
-            return Location(
+            loc = Location(
                 name=location_name,
                 latitude=20.0,
                 longitude=0.0,
                 country="Unknown"
             )
+            _geocoding_cache[location_name_lower] = loc  # Cache the result
+            return loc
         
         try:
             # Try Google Maps Geocoding API
@@ -71,13 +83,18 @@ class GeocodingService:
                     region=region
                 )
                 logger.info(f"Geocoded '{location_name}' via Google Maps: {loc.name}")
+                _geocoding_cache[location_name_lower] = loc  # Cache the result
                 return loc
             else:
                 logger.warning(f"No results from Google Maps for '{location_name}'")
-                return Location(name=location_name, latitude=20.0, longitude=0.0)
+                loc = Location(name=location_name, latitude=20.0, longitude=0.0)
+                _geocoding_cache[location_name_lower] = loc  # Cache the result
+                return loc
         
         except Exception as e:
             logger.error(f"Geocoding error for '{location_name}': {e}. Using fallback.")
-            return Location(name=location_name, latitude=20.0, longitude=0.0)
+            loc = Location(name=location_name, latitude=20.0, longitude=0.0)
+            _geocoding_cache[location_name_lower] = loc  # Cache the result
+            return loc
 
 geocoding_service = GeocodingService()

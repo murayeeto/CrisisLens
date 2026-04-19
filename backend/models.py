@@ -22,6 +22,7 @@ class Location(BaseModel):
 class AIAnalysis(BaseModel):
     summary: str
     category: str
+    severity: str  # critical, high, medium, low, info
     affected_groups: List[str]
     impact_analysis: str
     how_to_help: str

@@ -1,4 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+
+const router_future_flags = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+}
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallback, useEffect, useState } from 'react'
 import { BackgroundFX } from './components/layout/BackgroundFX'
@@ -133,7 +138,7 @@ function AppLayout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={router_future_flags}>
       <AppLayout />
     </BrowserRouter>
   )

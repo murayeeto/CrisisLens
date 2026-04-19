@@ -136,11 +136,20 @@ export default function CrisisGlobe({
   const resumeRotateRef = useRef(null)
   const globeMaterialRef = useRef(null)
   const hoveredPinRef = useRef(false)
+  const tooltipElementRef = useRef(null)
+  const isDraggingRef = useRef(false)
   const [size, setSize] = useState({ w: 0, h: 0 })
-  const [tooltip, setTooltip] = useState(null)
   const [globeMaterial, setGlobeMaterial] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
-  const isDraggingRef = useRef(false)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipElementRef.current && tooltipElementRef.current.parentNode) {
+        tooltipElementRef.current.parentNode.removeChild(tooltipElementRef.current)
+      }
+    }
+  }, [])
 
   const baseVisibleEvents = useMemo(
     () => (activeSeverities.length ? events.filter((event) => activeSeverities.includes(event.severity)) : events),
@@ -344,7 +353,9 @@ export default function CrisisGlobe({
       }
     }
     const handlePointerLeave = () => {
-      setTooltip(null)
+      if (tooltipElementRef.current) {
+        tooltipElementRef.current.style.display = 'none'
+      }
       hoveredPinRef.current = false
       onHoverChange?.(null)
       resumeAutoRotate()
@@ -394,10 +405,8 @@ export default function CrisisGlobe({
           elements.forEach((element) => {
             if (isPointVisible(event.lat, event.lng)) {
               element.style.visibility = 'visible'
-              element.style.pointerEvents = 'auto'
             } else {
               element.style.visibility = 'hidden'
-              element.style.pointerEvents = 'none'
             }
           })
         })
@@ -406,16 +415,6 @@ export default function CrisisGlobe({
 
     return () => window.clearInterval(interval)
   }, [onViewChange, visibleEvents, isPointVisible])
-
-  const updateTooltipPosition = useCallback((mouseEvent, event) => {
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltip({
-      event,
-      x: mouseEvent.clientX - rect.left + 14,
-      y: mouseEvent.clientY - rect.top + 14,
-    })
-  }, [])
 
   const handlePinClick = useCallback(
     (event) => {
@@ -431,6 +430,55 @@ export default function CrisisGlobe({
     },
     [focusedEventId, onClearFocus, onEventInspect, scheduleAutoRotateResume, size.w, stopAutoRotate],
   )
+
+  // Show tooltip directly in DOM without React state updates
+  const showTooltip = useCallback((event, mouseEvent) => {
+    if (!containerRef.current) return
+    
+    const rect = containerRef.current.getBoundingClientRect()
+    if (!rect) return
+
+    let tooltip = tooltipElementRef.current
+    if (!tooltip) {
+      tooltip = document.createElement('div')
+      tooltip.style.pointerEvents = 'none'
+      tooltip.style.position = 'absolute'
+      tooltip.style.zIndex = '20'
+      tooltip.style.maxWidth = '240px'
+      tooltip.style.borderRadius = '1rem'
+      tooltip.style.border = '1px solid rgba(255,255,255,0.1)'
+      tooltip.style.backgroundColor = 'rgba(11,16,32,0.82)'
+      tooltip.style.padding = '0.75rem'
+      tooltip.style.backdropFilter = 'blur(20px)'
+      tooltip.style.fontFamily = 'ui-monospace'
+      tooltip.style.fontSize = '11px'
+      tooltip.style.textTransform = 'uppercase'
+      tooltip.style.letterSpacing = '0.14em'
+      containerRef.current.appendChild(tooltip)
+      tooltipElementRef.current = tooltip
+    }
+
+    tooltip.innerHTML = `
+      <div style="color: rgb(34, 211, 238); margin-bottom: 0.5rem;">
+        ${event.location.split(',')[0]} · ${event.category}
+      </div>
+      <div style="color: rgb(148, 163, 184); font-size: 11px;">
+        ${event.severity} · ${formatTimeAgo(event.startedAt)}
+      </div>
+    `
+    
+    const x = mouseEvent.clientX - rect.left + 14
+    const y = mouseEvent.clientY - rect.top + 14
+    tooltip.style.left = `${x}px`
+    tooltip.style.top = `${y}px`
+    tooltip.style.display = 'block'
+  }, [])
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipElementRef.current) {
+      tooltipElementRef.current.style.display = 'none'
+    }
+  }, [])
 
   return (
     <div
@@ -460,27 +508,45 @@ export default function CrisisGlobe({
             el.setAttribute('data-event-id', d.id)
             el.style.pointerEvents = 'auto'
             el.style.transform = `translate(-50%, -50%) scale(${d.id === focusedEventId ? 1.22 : 1})`
-            
+
             el.innerHTML = `
               <div class="crisis-pin__hit"></div>
               <div class="crisis-pin__halo"></div>
               <div class="crisis-pin__ring"></div>
               <div class="crisis-pin__core"></div>
             `
-            el.onclick = () => handlePinClick(d)
-            el.onpointerenter = (event) => {
-              hoveredPinRef.current = true
-              stopAutoRotate()
-              onHoverChange?.(d)
-              updateTooltipPosition(event, d)
+
+            // Click handler with event prevention
+            const handleClick = (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              handlePinClick(d)
             }
-            el.onpointermove = (event) => updateTooltipPosition(event, d)
-            el.onpointerleave = () => {
+
+            // Hover handlers - these don't trigger React re-renders
+            const handleMouseEnter = (event) => {
+              hoveredPinRef.current = true
+              showTooltip(d, event)
+              onHoverChange?.(d)
+            }
+
+            const handleMouseMove = (event) => {
+              showTooltip(d, event)
+            }
+
+            const handleMouseLeave = () => {
               hoveredPinRef.current = false
-              setTooltip(null)
+              hideTooltip()
               onHoverChange?.(null)
               resumeAutoRotate()
             }
+
+            el.addEventListener('click', handleClick, true)
+            el.addEventListener('touchend', handleClick, true)
+            el.addEventListener('mouseenter', handleMouseEnter, false)
+            el.addEventListener('mousemove', handleMouseMove, false)
+            el.addEventListener('mouseleave', handleMouseLeave, false)
+
             return el
           }}
           ringsData={visibleEvents}
@@ -498,20 +564,6 @@ export default function CrisisGlobe({
           arcStroke={0.35}
           arcAltitudeAutoScale={0.45}
         />
-      ) : null}
-
-      {tooltip ? (
-        <div
-          className="pointer-events-none absolute z-20 max-w-[240px] rounded-2xl border border-white/10 bg-[rgba(11,16,32,0.82)] px-3 py-2 backdrop-blur-xl"
-          style={{ left: tooltip.x, top: tooltip.y }}
-        >
-          <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-white">
-            {tooltip.event.location.split(',')[0]} · {tooltip.event.category}
-          </div>
-          <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">
-            {tooltip.event.severity} · {formatTimeAgo(tooltip.event.startedAt)}
-          </div>
-        </div>
       ) : null}
 
       <ul className="sr-only">

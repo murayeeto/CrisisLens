@@ -61,12 +61,18 @@ export function EventCard({
         <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
           {(event.category || 'intel').replace('-', ' ')}
         </div>
-        {note ? (
+        {event.aiSummary && (
           <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-500/15 bg-cyan-500/[0.08] px-2.5 py-1 text-[11px] text-cyan-100/90">
             <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-            <span className="line-clamp-2">{note}</span>
+            <span className="line-clamp-2">{event.aiSummary}</span>
           </div>
-        ) : null}
+        )}
+        {event.affectedGroups && event.affectedGroups.length > 0 && !event.aiSummary && (
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-500/15 bg-cyan-500/[0.08] px-2.5 py-1 text-[11px] text-cyan-100/90">
+            <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="line-clamp-2">Affects: {event.affectedGroups.join(', ')}</span>
+          </div>
+        )}
         <h3 className="mt-2 line-clamp-2 font-display text-[17px] font-medium tracking-tightish text-white">{event.title}</h3>
         <p className="mt-2 line-clamp-2 text-[13px] leading-6 text-text-secondary">{event.previewText}</p>
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">

@@ -236,6 +236,22 @@ img {
   height: 16px;
   transform: translate(-50%, -50%);
   cursor: pointer;
+  pointer-events: auto !important;
+  z-index: 10;
+}
+
+.crisis-pin::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  pointer-events: auto;
+}
+
+.crisis-pin__hit {
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  background: transparent;
 }
 
 .crisis-pin__hit {

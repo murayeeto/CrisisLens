@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bookmark, Clock3, ExternalLink, MapPin, Share2, X } from 'lucide-react'
+import { Bookmark, Clock3, MapPin, Share2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEventDetail } from '../../hooks/useEventDetail'
@@ -234,7 +234,16 @@ export function EventDetailPanel({ eventId, onClose }) {
                     </section>
 
                     <section>
-                      <ImpactTriad impacts={detail.impacts || []} severity={detail.severity} />
+                      <ImpactTriad 
+                        impacts={
+                          detail.affectedGroups?.map((group) => ({
+                            label: group,
+                            value: 'Affected population',
+                            severity: 'May experience direct impact'
+                          })) || []
+                        } 
+                        severity={detail.severity} 
+                      />
                     </section>
 
                     <section>
@@ -242,9 +251,20 @@ export function EventDetailPanel({ eventId, onClose }) {
                         ◦ What to Watch Next
                       </div>
                       <div className="mt-4">
-                        <WhatToWatch items={detail.whatToWatch || []} />
+                        <WhatToWatch items={detail.watchGuidance ? [detail.watchGuidance] : []} />
                       </div>
                     </section>
+
+                    {detail.impactAnalysis && (
+                      <section>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
+                          ◦ Impact Analysis
+                        </div>
+                        <div className="mt-4">
+                          <p className="text-[13px] leading-6 text-text-secondary">{detail.impactAnalysis}</p>
+                        </div>
+                      </section>
+                    )}
 
                     <section>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">
@@ -257,19 +277,12 @@ export function EventDetailPanel({ eventId, onClose }) {
 
                     <section>
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-400">◦ How to Help</div>
-                      <div className="mt-4 space-y-2">
-                        {(detail.howToHelp || []).map((item) => (
-                          <a
-                            key={item.label}
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="glass-panel glass-panel--interactive flex items-center justify-between rounded-full px-4 py-3 text-sm text-text-secondary hover:text-white"
-                          >
-                            <span>{item.label}</span>
-                            <ExternalLink className="h-4 w-4 text-cyan-400" />
-                          </a>
-                        ))}
+                      <div className="mt-4">
+                        {detail.howToHelp ? (
+                          <p className="text-[13px] leading-6 text-text-secondary">{detail.howToHelp}</p>
+                        ) : (
+                          <p className="text-[13px] leading-6 text-text-secondary/50 italic">No assistance guidance available</p>
+                        )}
                       </div>
                     </section>
 
