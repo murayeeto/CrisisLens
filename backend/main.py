@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 import hashlib
 from datetime import datetime
+from urllib.parse import urlparse
 from config import config
 from utils.logger import logger
 from services.firebase_service import firebase_service
@@ -68,6 +69,27 @@ def _safe_int(value, default=0):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+def _normalize_base_url(value):
+    if not value or not isinstance(value, str):
+        return None
+
+    parsed = urlparse(value.strip())
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+def _resolve_checkout_base_url(payload):
+    payload_base_url = _normalize_base_url(payload.get("returnBaseUrl"))
+    origin_base_url = _normalize_base_url(request.headers.get("Origin"))
+    referer_base_url = _normalize_base_url(request.referrer)
+    configured_base_url = _normalize_base_url(config.APP_BASE_URL)
+
+    if payload_base_url and payload_base_url in {origin_base_url, referer_base_url}:
+        return payload_base_url
+
+    return origin_base_url or referer_base_url or configured_base_url or payload_base_url or "http://localhost:5173"
 
 def _normalize_severity(value):
     if value == "moderate":
@@ -904,10 +926,12 @@ def create_campaign_checkout_session(campaign_id):
     amount_cents = relief_fund_service.validate_checkout(campaign, payload.get("amount"))
     donor_name = (payload.get("donorName") or "").strip()
     donor_email = (payload.get("donorEmail") or "").strip()
+    base_url = _resolve_checkout_base_url(payload)
 
     checkout_session = stripe_service.create_checkout_session(
         campaign=campaign,
         amount_cents=amount_cents,
+        base_url=base_url,
         donor_name=donor_name,
         donor_email=donor_email,
     )

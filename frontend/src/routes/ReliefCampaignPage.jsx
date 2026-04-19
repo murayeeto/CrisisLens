@@ -40,6 +40,8 @@ export default function ReliefCampaignPage() {
   const [donation, setDonation] = useState(null)
   const [statusState, setStatusState] = useState(searchParams.get('checkout') === 'cancelled' ? 'cancelled' : '')
   const [reviewPending, setReviewPending] = useState(false)
+  const [redirectCountdown, setRedirectCountdown] = useState(5)
+  const [autoRedirectEnabled, setAutoRedirectEnabled] = useState(true)
 
   const sessionId = searchParams.get('session_id')
   const donationAmount = customAmount ? Number(customAmount) : selectedAmount
@@ -47,6 +49,7 @@ export default function ReliefCampaignPage() {
   const isOwner = Boolean(profile?.uid && campaign?.owner?.uid && profile.uid === campaign.owner.uid)
   const isReviewer = profile?.role === 'reviewer'
   const isPrivileged = isOwner || isReviewer
+  const returnPath = campaign?.eventId ? `/trending?event=${campaign.eventId}` : '/trending'
   const reviewBanner =
     campaign?.reviewStatus === 'pending'
       ? 'Review pending.'
@@ -89,6 +92,34 @@ export default function ReliefCampaignPage() {
     }
   }, [refetch, sessionId])
 
+  useEffect(() => {
+    if (statusState === 'completed') {
+      setAutoRedirectEnabled(true)
+    }
+  }, [statusState])
+
+  useEffect(() => {
+    if (statusState !== 'completed' || !autoRedirectEnabled) {
+      setRedirectCountdown(5)
+      return undefined
+    }
+
+    setRedirectCountdown(5)
+
+    const countdownInterval = window.setInterval(() => {
+      setRedirectCountdown((current) => (current > 1 ? current - 1 : 1))
+    }, 1000)
+
+    const redirectTimer = window.setTimeout(() => {
+      navigate(returnPath, { replace: true })
+    }, 5000)
+
+    return () => {
+      window.clearInterval(countdownInterval)
+      window.clearTimeout(redirectTimer)
+    }
+  }, [autoRedirectEnabled, navigate, returnPath, statusState])
+
   const handleCheckout = async () => {
     setHelper('')
 
@@ -103,6 +134,7 @@ export default function ReliefCampaignPage() {
         amount: donationAmount,
         donorName,
         donorEmail,
+        returnBaseUrl: window.location.origin,
       })
       window.location.assign(response.url)
     } catch (checkoutError) {
@@ -232,6 +264,47 @@ export default function ReliefCampaignPage() {
           </div>
 
           <StatusBanner state={statusState} donation={donation} />
+          {statusState === 'completed' ? (
+            <div className="mt-4 rounded-[20px] border border-cyan-500/18 bg-cyan-500/[0.05] px-4 py-4">
+              <div className="text-sm leading-7 text-cyan-100">
+                Redirecting you back in {redirectCountdown}s.
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button className="rounded-[18px] px-5 py-3 text-[11px]" onClick={() => navigate(returnPath, { replace: true })}>
+                  Back to website
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="rounded-[18px] px-5 py-3 text-[11px]"
+                  onClick={() => {
+                    setAutoRedirectEnabled(false)
+                    navigate(`/relief/${campaignId}`, { replace: true })
+                  }}
+                >
+                  Stay on this page
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {statusState === 'cancelled' ? (
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button className="rounded-[18px] px-5 py-3 text-[11px]" onClick={() => navigate(returnPath)}>
+                Back to website
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="rounded-[18px] px-5 py-3 text-[11px]"
+                onClick={() => {
+                  setStatusState('')
+                  navigate(`/relief/${campaignId}`, { replace: true })
+                }}
+              >
+                Try again here
+              </Button>
+            </div>
+          ) : null}
           {!statusState && reviewBanner ? (
             <div className="mt-5 rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-text-secondary">
               {reviewBanner}

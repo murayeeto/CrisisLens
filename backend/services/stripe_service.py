@@ -15,14 +15,14 @@ class StripeService:
         stripe.api_key = config.STRIPE_SECRET_KEY
         return stripe
 
-    def create_checkout_session(self, campaign, amount_cents, donor_name="", donor_email=""):
+    def create_checkout_session(self, campaign, amount_cents, base_url=None, donor_name="", donor_email=""):
         stripe = self._get_client()
         metadata = {
             "campaignId": campaign.get("id"),
             "eventId": campaign.get("eventId"),
             "ownerUid": campaign.get("owner", {}).get("uid") or "",
         }
-        base_url = config.APP_BASE_URL.rstrip("/")
+        base_url = (base_url or config.APP_BASE_URL).rstrip("/")
         success_url = f"{base_url}/relief/{campaign.get('id')}?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
         cancel_url = f"{base_url}/relief/{campaign.get('id')}?checkout=cancelled"
 
