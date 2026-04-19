@@ -53,16 +53,26 @@ export const severityConfig = {
 
 export const severityOrder = ['critical', 'high', 'medium', 'low', 'info']
 
-export const getSeverityConfig = (severity) => severityConfig[severity] ?? severityConfig.info
+export const severityAliases = {
+  moderate: 'medium',
+}
+
+export const normalizeSeverity = (severity) => {
+  const value = typeof severity === 'string' ? severity.trim().toLowerCase() : ''
+  const normalized = severityAliases[value] ?? value
+  return severityConfig[normalized] ? normalized : 'info'
+}
+
+export const getSeverityConfig = (severity) => severityConfig[normalizeSeverity(severity)] ?? severityConfig.info
 
 export const severityColor = (severity) => getSeverityConfig(severity).color
 
 export const severityColorRGBA = (severity) => {
-  const { color } = getSeverityConfig(severity)
-  if (severity === 'critical') return `rgba(239, 68, 68, 0.65)`
-  if (severity === 'high') return `rgba(249, 115, 22, 0.55)`
-  if (severity === 'moderate') return `rgba(245, 158, 11, 0.5)`
-  if (severity === 'low') return `rgba(34, 211, 238, 0.5)`
+  const normalized = normalizeSeverity(severity)
+  if (normalized === 'critical') return `rgba(239, 68, 68, 0.65)`
+  if (normalized === 'high') return `rgba(249, 115, 22, 0.55)`
+  if (normalized === 'medium') return `rgba(245, 158, 11, 0.5)`
+  if (normalized === 'low') return `rgba(34, 211, 238, 0.5)`
   return `rgba(100, 116, 139, 0.42)`
 }
 

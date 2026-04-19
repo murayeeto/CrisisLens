@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -8,9 +8,18 @@ class NewsArticle(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     source_name: str
+    source_uri: Optional[str] = None
     published_at: str
     url: str
     content: Optional[str] = None
+    language: Optional[str] = None
+    event_uri: Optional[str] = None
+    event_key: Optional[str] = None
+    duplicate_of: Optional[str] = None
+    is_duplicate: Optional[bool] = None
+    social_score: Optional[float] = None
+    categories: List[str] = Field(default_factory=list)
+    concepts: List[str] = Field(default_factory=list)
 
 class Location(BaseModel):
     name: str

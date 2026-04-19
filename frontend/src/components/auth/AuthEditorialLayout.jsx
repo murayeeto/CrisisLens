@@ -46,7 +46,7 @@ export function AuthEditorialLayout({
             </Link>
           </div>
 
-          <div className="relative z-10 mt-12 max-w-[620px] lg:mt-20">
+          <div className="relative z-10 mt-8 max-w-[580px] lg:mt-14">
             {kicker ? (
               <div className="inline-flex rounded-full border border-cyan-500/18 bg-cyan-500/[0.08] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300">
                 {kicker}
@@ -57,13 +57,13 @@ export function AuthEditorialLayout({
                 {eyebrow}
               </div>
             ) : null}
-            <h1 className="mt-4 max-w-[11ch] font-display text-[44px] font-semibold leading-[0.96] tracking-snug text-white sm:text-[58px] lg:text-[72px]">
+            <h1 className="mt-3 max-w-[11ch] font-display text-[40px] font-semibold leading-[0.96] tracking-snug text-white sm:text-[52px] lg:text-[64px]">
               {title}
             </h1>
             {description ? (
               <p className="mt-6 max-w-[54ch] text-[16px] leading-8 text-text-secondary sm:text-[17px]">{description}</p>
             ) : null}
-            <div className="mt-8 sm:mt-10">
+            <div className="mt-6 sm:mt-8">
               <AuthHeroScene />
             </div>
           </div>

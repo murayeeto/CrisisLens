@@ -48,9 +48,10 @@ async function fetch_api(path, options = {}) {
 }
 
 export const api = {
-  getEvents: ({ language } = {}) => {
+  getEvents: ({ language, limit } = {}) => {
     const params = new URLSearchParams()
     if (language) params.set('language', language)
+    if (limit) params.set('limit', String(limit))
     const search = params.toString()
     return fetch_api(`/api/events${search ? `?${search}` : ''}`)
   },

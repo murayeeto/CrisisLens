@@ -31,10 +31,9 @@ export function AuthHeroScene() {
   return (
     <div className="auth-impact-scene" aria-hidden="true">
       <div className="auth-impact-scene__header">
-        <span className="auth-impact-scene__eyebrow">Impact model</span>
         <span className="auth-impact-scene__pulse">
           <Activity className="h-3.5 w-3.5" />
-          Tracing consequences
+          Trace consequences
         </span>
       </div>
 
