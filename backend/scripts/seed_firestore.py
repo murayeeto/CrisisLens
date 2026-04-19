@@ -22,8 +22,8 @@ def seed_firestore():
     print('[seed] Fetching events from backend API...')
     
     try:
-        # Fetch events from API
-        response = requests.get('http://localhost:8000/api/events', timeout=45)
+        # Fetch events from API (increased timeout for multiple articles)
+        response = requests.get('http://localhost:8000/api/events', timeout=90)
         response.raise_for_status()
         events = response.json()
         
@@ -32,6 +32,13 @@ def seed_firestore():
             return False
         
         print(f'[seed] Retrieved {len(events)} events from API')
+        
+        # Show sample events
+        if events:
+            print(f'[seed] Sample event: {events[0].get("title", "N/A")[:60]}...')
+            print(f'[seed] Location: {events[0].get("location", "N/A")}')
+            print(f'[seed] Coordinates: ({events[0].get("lat", "?")}, {events[0].get("lng", "?")})')
+        
         print('[seed] Adding events to Firestore...')
         
         # Add events to Firestore

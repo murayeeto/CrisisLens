@@ -17,6 +17,7 @@ class EventService:
         """
         Convert a list of articles into a structured event with AI analysis.
         Uses deterministic event ID based on article URL for consistent lookups.
+        Extracts location from multiple sources in articles.
         """
         if not articles:
             raise ValueError("At least one article is required")
@@ -32,18 +33,35 @@ class EventService:
             logger.info(f"Event {event_id} already exists in store")
             return _event_store[event_id]
         
-        # Extract location from articles
-        location_text = extract_location_from_text(
-            f"{primary.title} {primary.description}"
-        )
+        # Try to extract location from multiple article sources
+        location_text = None
         
-        if not location_text:
-            location_text = extract_location_from_text(primary.content or "")
+        # 1. Try title first (often contains location)
+        if primary.title:
+            location_text = extract_location_from_text(primary.title)
+        
+        # 2. If not found, try description
+        if not location_text and primary.description:
+            location_text = extract_location_from_text(primary.description)
+        
+        # 3. If still not found, try full content
+        if not location_text and primary.content:
+            location_text = extract_location_from_text(primary.content)
+        
+        # 4. Combine multiple article sources for better location detection
+        if not location_text and len(articles) > 1:
+            combined_text = "\n".join([
+                f"{a.title}\n{a.description}\n{a.content}"
+                for a in articles[:3]  # Check first 3 articles
+            ])
+            location_text = extract_location_from_text(combined_text)
         
         location_text = clean_location_name(location_text) if location_text else "Undisclosed Location"
+        logger.info(f"Extracted location: '{location_text}'")
         
         # Geocode location
         location = geocoding_service.geocode_location(location_text)
+        logger.info(f"Geocoded to: {location.name} ({location.latitude}, {location.longitude})")
         
         # Generate AI analysis
         articles_text = "\n".join([
